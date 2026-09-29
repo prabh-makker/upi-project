@@ -1,0 +1,19 @@
+# Data files
+data/raw/
+data/processed/
+
+# Python
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Power BI
+*.pbix
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/

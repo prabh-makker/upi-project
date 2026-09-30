@@ -7,7 +7,7 @@ Resume project for data analyst roles.
 |---|---|---|
 | `npci_upi_monthly_FY2025-26.xlsx` | Monthly UPI banks live, volume, value, Apr 2025 to Mar 2026 | NPCI UPI product statistics page, downloaded 2026-09-30 |
 | `npci_upi_monthly_FY2026-27.xlsx` | Same columns, Apr to Aug 2026 | NPCI UPI product statistics page, downloaded 2026-09-30 |
-| `upi_monthly_2016-04_to_2025-08.csv` | Same columns, Apr 2016 to Aug 2025 | Source link to be added. Its Apr to Aug 2025 rows match the NPCI FY2025-26 file exactly |
+| `upi_monthly_2016-04_to_2025-08.csv` | Same columns, Apr 2016 to Aug 2025 | Kaggle: [UPI Transaction Monthly Data (India, 2016-2025)](https://www.kaggle.com/datasets/syedahmadrayyan/upi-transaction-monthly-data-india-20162025), a copy of NPCI figures. Its Apr to Aug 2025 rows match the NPCI FY2025-26 file exactly |
 
 Where files overlap, the NPCI download is used. Together they cover Apr 2016 to Aug 2026 with no missing months.
 

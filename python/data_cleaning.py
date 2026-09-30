@@ -21,10 +21,19 @@ Also (data/raw/bank_top50):
                               one file per month. Percent columns can come as 0.9122 or 91.22;
                               both are stored as 91.22.
 
+Also (data/raw/chargeback):
+- Ecosystem-Statistics-UPI-Chargeback-<YYYY>-<Mon>.xlsx
+                              NPCI Ecosystem Statistics > Chargeback, one file per month, by
+                              beneficiary bank. The CB ratio is recalculated from the counts
+                              because NPCI rounds it to 0.000% for big banks.
+
 Output:
 - data/processed/upi_monthly.csv  (month_date, banks_live, volume_mn, value_cr, source_file)
 - data/processed/bank_monthly.csv (month_date, bank_name, volume_mn, approved_pct, bd_pct, td_pct,
                                    debit_reversal_mn, debit_reversal_success_pct, source_file)
+- data/processed/chargeback_monthly.csv (month_date, bank_code, bank_name, total_txns,
+                                   chargebacks_received, representments, chargebacks_accepted,
+                                   cb_ratio_pct, source_file)
 """
 
 import glob
@@ -38,6 +47,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW_DIR = os.path.join(ROOT, 'data', 'raw')
 PROCESSED_DIR = os.path.join(ROOT, 'data', 'processed')
 BANK_DIR = os.path.join(RAW_DIR, 'bank_top50')
+CHARGEBACK_DIR = os.path.join(RAW_DIR, 'chargeback')
 
 # Raw column name -> clean column name
 COLUMN_MAP = {
@@ -154,6 +164,51 @@ def clean_bank_files():
     return df
 
 
+CHARGEBACK_COLUMNS = {
+    'code': 'bank_code',
+    'beneficiary bank': 'bank_name',
+    'total txns during the month': 'total_txns',
+    'chargebacks received during the month': 'chargebacks_received',
+    're-presentment raised during the month': 'representments',
+    'chargebacks accepted during the month': 'chargebacks_accepted',
+}
+
+
+def read_chargeback_file(path):
+    m = re.search(r'(\d{4})-(\w{3})', os.path.basename(path))
+    if not m:
+        raise SystemExit(f"Can't tell which month {os.path.basename(path)} is for")
+    month_date = pd.to_datetime(f"{m.group(2)}-{m.group(1)}", format='%b-%Y')
+
+    df = pd.read_excel(path, dtype=str)
+    df.columns = [str(c).strip().lower() for c in df.columns]
+    df = df.rename(columns=CHARGEBACK_COLUMNS)[list(CHARGEBACK_COLUMNS.values())]
+    df = df.dropna(subset=['bank_name'])
+    df['bank_code'] = df['bank_code'].str.strip().str.upper()
+    df['bank_name'] = df['bank_name'].str.strip().str.upper()
+    for col in ['total_txns', 'chargebacks_received', 'representments', 'chargebacks_accepted']:
+        df[col] = to_number(df[col]).astype('Int64')
+    df['cb_ratio_pct'] = (100 * df['chargebacks_received'] / df['total_txns'].replace(0, pd.NA)).astype(float).round(6)
+    df.insert(0, 'month_date', month_date)
+    df['source_file'] = os.path.basename(path)
+    return df
+
+
+def clean_chargeback_files():
+    files = sorted(glob.glob(os.path.join(CHARGEBACK_DIR, '*.xlsx')))
+    if not files:
+        return None
+    df = pd.concat([read_chargeback_file(p) for p in files], ignore_index=True)
+    rows_before = len(df)
+    df = df.drop_duplicates(subset=['month_date', 'bank_code']).sort_values(['month_date', 'total_txns'],
+                                                                           ascending=[True, False])
+    months = df['month_date'].sort_values().dt.strftime('%b-%Y').unique()
+    print(f"  chargeback: {len(files)} files, {len(df)} bank-month rows "
+          f"({rows_before - len(df)} duplicates dropped), months: {', '.join(months)}")
+    df['month_date'] = df['month_date'].dt.date
+    return df
+
+
 def main():
     files = sorted(glob.glob(os.path.join(RAW_DIR, '*.xlsx')) + glob.glob(os.path.join(RAW_DIR, '*.csv')))
     if not files:
@@ -194,6 +249,12 @@ def main():
     if banks is not None:
         out = os.path.join(PROCESSED_DIR, 'bank_monthly.csv')
         banks.to_csv(out, index=False)
+        print(f"Saved {out}")
+
+    chargebacks = clean_chargeback_files()
+    if chargebacks is not None:
+        out = os.path.join(PROCESSED_DIR, 'chargeback_monthly.csv')
+        chargebacks.to_csv(out, index=False)
         print(f"Saved {out}")
 
 

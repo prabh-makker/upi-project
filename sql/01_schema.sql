@@ -24,3 +24,16 @@ CREATE TABLE bank_monthly (
     source_file                 VARCHAR(150)  NOT NULL COMMENT 'Raw file this row came from',
     PRIMARY KEY (month_date, bank_name)
 );
+
+CREATE TABLE chargeback_monthly (
+    month_date            DATE          NOT NULL COMMENT '1st day of the month',
+    bank_code             VARCHAR(10)   NOT NULL COMMENT 'NPCI member code',
+    bank_name             VARCHAR(120)  NOT NULL COMMENT 'Beneficiary (receiving) bank or bank + app handle',
+    total_txns            BIGINT        NULL COMMENT 'Transactions received that month',
+    chargebacks_received  INT           NULL COMMENT 'Customer disputes raised',
+    representments        INT           NULL COMMENT 'Disputes the bank contested',
+    chargebacks_accepted  INT           NULL COMMENT 'Disputes the bank accepted',
+    cb_ratio_pct          DECIMAL(12,6) NULL COMMENT 'chargebacks_received / total_txns * 100',
+    source_file           VARCHAR(150)  NOT NULL COMMENT 'Raw file this row came from',
+    PRIMARY KEY (month_date, bank_code)
+);

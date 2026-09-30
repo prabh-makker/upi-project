@@ -9,7 +9,10 @@ Resume project for data analyst roles.
 | `npci_upi_monthly_FY2026-27.xlsx` | Same columns, Apr to Aug 2026 | NPCI UPI product statistics page, downloaded 2026-09-30 |
 | `upi_monthly_2016-04_to_2025-08.csv` | Same columns, Apr 2016 to Aug 2025 | Kaggle: [UPI Transaction Monthly Data (India, 2016-2025)](https://www.kaggle.com/datasets/syedahmadrayyan/upi-transaction-monthly-data-india-20162025), a copy of NPCI figures. Its Apr to Aug 2025 rows match the NPCI FY2025-26 file exactly |
 
-Where files overlap, the NPCI download is used. Together they cover Apr 2016 to Aug 2026 with no missing months.
+| `bank_top50/*.xlsx` | Top 50 remitter banks per month: volume, approved %, BD %, TD %, debit reversals | NPCI Ecosystem Statistics > Top 50 Member Performance (Remitter) |
+| `chargeback/*.xlsx` | Chargebacks per beneficiary bank per month | NPCI Ecosystem Statistics > Chargeback |
+
+Where monthly files overlap, the NPCI download is used. Together they cover Apr 2016 to Aug 2026 with no missing months.
 
 ## Structure
 - data/ → raw/processed/reference

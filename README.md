@@ -40,6 +40,16 @@ creates the Power BI views (`sql/04_views.sql`), and runs 12 data quality checks
 Safe to re-run any time, for example after adding a new NPCI file to `data/raw`.
 Then run `sql/02_analysis_queries.sql` (18 business questions) in MySQL Workbench.
 
+## Forecast (basic ML)
+1. `pip install scikit-learn matplotlib`
+2. `python python/forecast.py` (after the loader)
+
+It forecasts total UPI volume for the next 6 months with scikit-learn's `LinearRegression`, after testing
+it against a naive "same as last month" guess and a constant-% growth model on 5 six-month windows it
+never saw. The straight line wins with a 4% average error, against 10% for the naive guess.
+Results go to MySQL (`upi_forecast`, `forecast_eval`) and `findings/forecast.png`.
+Method, results and limits: [docs/forecast.md](docs/forecast.md).
+
 Power BI dashboard, step by step: [powerbi/POWERBI_GUIDE.md](powerbi/POWERBI_GUIDE.md).
 
 Column meanings, KPI formulas and known limitations: [docs/data_dictionary.md](docs/data_dictionary.md).

@@ -5,6 +5,7 @@ has the latest data:
 
 ```
 python python/load_to_mysql.py
+python python/forecast.py
 ```
 
 Time needed: about 2 to 3 hours the first time. Save often (Ctrl+S) as `powerbi/upi_scorecard.pbix`.
@@ -16,13 +17,14 @@ Time needed: about 2 to 3 hours the first time. Save often (Ctrl+S) as `powerbi/
 1. Open Power BI Desktop → **Home → Get data → More… → Database → MySQL database → Connect**.
 2. Server: `localhost`  Database: `upi_db` → **OK**.
 3. If it asks for login: choose **Database** on the left, user `root`, your MySQL password → **Connect**.
-4. In the Navigator, tick these 6 items → **Load**:
+4. In the Navigator, tick these items → **Load**:
    - `upi_db.vw_upi_growth`
    - `upi_db.vw_bank_scorecard`
    - `upi_db.vw_app_share`
    - `upi_db.vw_data_health`
    - `upi_db.vw_load_history`
    - `upi_db.dim_bank`
+   - `upi_db.upi_forecast` and `upi_db.forecast_eval` (made by `forecast.py`, used on page 7)
 5. In the **Data** pane on the right, the tables may be called `upi_db vw_upi_growth` etc.
    Double-click each one and rename it to just `vw_upi_growth`, `vw_bank_scorecard`, and so on.
    **The DAX formulas below use these short names.**
@@ -32,7 +34,7 @@ install **MySQL Connector/NET** from https://dev.mysql.com/downloads/connector/n
 Power BI and try again.
 
 **If it still won't connect**, use the CSV backup: **Get data → Text/CSV** and load each file
-from `powerbi/data/` (the loader writes these every run). Everything else below is the same.
+from `powerbi/data/` (the loader and `forecast.py` write these every run). Everything else below is the same.
 
 ---
 
@@ -43,7 +45,7 @@ from `powerbi/data/` (the loader writes these every run). Everything else below 
 ```DAX
 Dates =
 ADDCOLUMNS (
-    CALENDAR ( DATE ( 2016, 4, 1 ), DATE ( 2026, 12, 31 ) ),
+    CALENDAR ( DATE ( 2016, 4, 1 ), DATE ( 2027, 12, 31 ) ),
     "Year", YEAR ( [Date] ),
     "Month No", MONTH ( [Date] ),
     "Month", FORMAT ( [Date], "MMM yyyy" ),
@@ -64,6 +66,7 @@ ADDCOLUMNS (
    - `Dates[Date]` → `vw_bank_scorecard[month_date]`
    - `Dates[Date]` → `vw_app_share[month_date]`
    - `dim_bank[bank_name]` → `vw_bank_scorecard[bank_name]`
+   - `Dates[Date]` → `upi_forecast[month_date]`
 
 ---
 
@@ -215,12 +218,23 @@ Rule for every chart: the title says the **finding**, not just the chart name.
   (conditional formatting: status = FAIL red, WARN orange)
 - **Table:** `vw_load_history` (latest runs)
 
+### Page 7: Forecast (basic ML)
+- **Title:** "UPI should reach about 26.4 billion transactions a month by Feb 2027 (straight-line model, 4% average test error)".
+  Check the numbers against what `forecast.py` printed and update the title if they changed.
+- **Line chart:** X = `upi_forecast[month_date]`, Y = `actual_volume_mn`, `forecast_volume_mn`,
+  `lower_mn`, `upper_mn` (all as Sum). Filter `month_date` from 2023 onward.
+  Format the `lower_mn` and `upper_mn` lines as dashed and light grey.
+- **Table:** `forecast_eval` columns `model`, `test_window`, `mape_pct`. It shows the straight line
+  beating the naive guess and the % growth model in every test window.
+- **Text box:** "Tested on 5 six-month windows it had never seen. Ignores seasonality, so March and
+  Oct-Nov come in above the line." Method and results: `docs/forecast.md`.
+
 ---
 
 ## Step 6. Refresh and publish
 
-- New month from NPCI? Put the file in `data/raw/...`, run `python python/load_to_mysql.py`,
-  then **Home → Refresh** in Power BI.
+- New month from NPCI? Put the file in `data/raw/...`, run `python python/load_to_mysql.py` and
+  `python python/forecast.py`, then **Home → Refresh** in Power BI.
 - Save the file as `powerbi/upi_scorecard.pbix` and commit it.
 - Take a screenshot of each page (Windows + Shift + S), save them as `powerbi/screenshots/page1.png` and so on.
   They go in the README.

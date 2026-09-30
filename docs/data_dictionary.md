@@ -17,6 +17,8 @@ Database: `upi_db` (MySQL 8). Loaded by `python python/load_to_mysql.py`.
 | `dim_bank` | bank | n/a | Hand-made lookup in `data/reference/bank_type.csv` (Public / Private / Small finance / Payments / Regional rural / Cooperative / Foreign / Card issuer) |
 | `etl_run_log` | table loaded per run | all runs | written by the loader |
 | `dq_results` | quality check per run | all runs | written by `sql/03_quality_checks.sql` |
+| `upi_forecast` | month (actual, test or future) | Apr 2016 to 6 months past the latest | written by `python/forecast.py` |
+| `forecast_eval` | model x 6-month test window | 5 windows | written by `python/forecast.py` |
 
 ## Columns
 
@@ -49,6 +51,16 @@ Database: `upi_db` (MySQL 8). Loaded by `python python/load_to_mysql.py`.
 | chargeback_monthly | representments | INT | Disputes the bank contested | count |
 | chargeback_monthly | chargebacks_accepted | INT | Disputes the bank accepted | count |
 | chargeback_monthly | cb_ratio_pct | DECIMAL | chargebacks_received / total_txns x 100 (recalculated; NPCI rounds it to 0.000%) | % |
+| upi_forecast | month_date | DATE | Month | date |
+| upi_forecast | row_type | TEXT | `actual` (history), `test` (last 6 known months, predicted without seeing them), `future` (forecast) | |
+| upi_forecast | actual_volume_mn | DOUBLE | NPCI volume (empty for future months) | million |
+| upi_forecast | forecast_volume_mn | DOUBLE | Model's prediction (test and future rows) | million |
+| upi_forecast | lower_mn / upper_mn | DOUBLE | Forecast minus / plus the model's average test error (future rows) | million |
+| upi_forecast | model | TEXT | Model that won the tests (currently Linear trend) | |
+| forecast_eval | model | TEXT | Naive (repeat last month), Linear trend or Log-linear trend | |
+| forecast_eval | test_window / test_start | TEXT / DATE | The 6 months the model predicted without seeing them | |
+| forecast_eval | mae_mn | DOUBLE | Average miss | million |
+| forecast_eval | mape_pct | DOUBLE | Average miss as % of actual | % |
 
 ## Views for Power BI (`sql/04_views.sql`)
 
@@ -72,6 +84,7 @@ Database: `upi_db` (MySQL 8). Loaded by `python python/load_to_mysql.py`.
 | App share % | app total_volume_mn / SUM over all apps that month x 100 | Market concentration |
 | Top-2 app share % | share of the two biggest apps | NPCI's proposed 30% market cap is about this |
 | Chargeback ratio % | chargebacks_received / total_txns x 100 | Dispute rate at the receiving bank |
+| Forecast error (MAPE) % | average of abs(actual - forecast) / actual x 100 over a test window | How far off the volume forecast is, on months it never saw |
 
 ## Quality checks (`sql/03_quality_checks.sql`)
 

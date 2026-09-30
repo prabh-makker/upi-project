@@ -9,9 +9,11 @@ What it does:
 3. Creates the database (default: upi_db) if it doesn't exist
 4. Runs sql/00_log_tables.sql (run log + quality results, kept across runs)
 5. Runs sql/01_schema.sql, which drops and rebuilds the data tables, so re-running is always safe
-6. Loads every CSV in data/processed into the table with the same name, logging each load
+6. Loads every CSV in data/processed into the table with the same name, logging each load,
+   then checks that MySQL's row counts match the CSVs
 7. Runs sql/04_views.sql (views for Power BI), then sql/03_quality_checks.sql and prints the results
-8. Prints row counts and a sample query, which proves Python is talking to MySQL
+8. Saves CSV copies of the 5 views to powerbi/data/ (backup for Power BI) and prints a sample query,
+   which proves Python is talking to MySQL
 
 Run from the project root:
     python python/load_to_mysql.py
@@ -157,16 +159,10 @@ def main():
         pd.read_sql(text(f"SELECT * FROM {view}"), engine).to_csv(os.path.join(POWERBI_DIR, f"{view}.csv"), index=False)
     print(f"\nSaved {len(POWERBI_VIEWS)} view exports to powerbi/data/ (backup for Power BI)")
 
-    if 'upi_monthly' in loaded:
-        print("\nSample query (last 6 months in upi_monthly):")
-        sample = pd.read_sql(text("""
-            SELECT month_date, banks_live, volume_mn, value_cr,
-                   ROUND(value_cr * 10 / volume_mn, 2) AS avg_ticket_rs
-            FROM upi_monthly
-            ORDER BY month_date DESC
-            LIMIT 6
-        """), engine)
-        print(sample.to_string(index=False))
+    print("\nSample query (last 6 months in vw_upi_growth):")
+    sample = pd.read_sql(text("SELECT month_date, banks_live, volume_mn, value_cr, avg_ticket_rs "
+                              "FROM vw_upi_growth ORDER BY month_date DESC LIMIT 6"), engine)
+    print(sample.to_string(index=False))
 
     engine.dispose()
     if not all_ok:

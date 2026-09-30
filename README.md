@@ -18,7 +18,7 @@ Where monthly files overlap, the NPCI download is used. Together they cover Apr 
 - data/ → raw/ (NPCI downloads + Kaggle CSV), processed/ (made by the cleaner), reference/bank_type.csv
 - python/ → data_cleaning.py, load_to_mysql.py (run this), forecast.py
 - sql/ → 00 log tables, 01 schema, 02 analysis queries (18), 03 quality checks, 04 Power BI views
-- powerbi/ → 7-page dashboard guide + CSV exports of the views
+- powerbi/ → 7-page dashboard guide (the loader and forecast.py write CSV backups to powerbi/data/, not committed)
 - docs/ → data dictionary, forecast method
 - findings/ → forecast chart, interview prep
 
@@ -30,8 +30,8 @@ Where monthly files overlap, the NPCI download is used. Together they cover Apr 
 ## Load data into MySQL (Python)
 `python python/load_to_mysql.py`
 
-This cleans `data/raw` into `data/processed`, creates `upi_db` if needed, rebuilds the four data tables
-(`upi_monthly`, `bank_monthly`, `app_monthly`, `chargeback_monthly`), loads them, logs the run in `etl_run_log`,
+This cleans `data/raw` into `data/processed`, creates `upi_db` if needed, rebuilds the five data tables
+(`upi_monthly`, `bank_monthly`, `app_monthly`, `chargeback_monthly`, `dim_bank`), loads them, logs the run in `etl_run_log`,
 creates the Power BI views (`sql/04_views.sql`), and runs 12 data quality checks (`sql/03_quality_checks.sql`, results in `dq_results`).
 Safe to re-run any time, for example after adding a new NPCI file to `data/raw`.
 Then run `sql/02_analysis_queries.sql` (18 business questions) in MySQL Workbench.

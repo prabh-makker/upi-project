@@ -19,7 +19,8 @@ report = os.path.join(root, 'graphify-out', 'GRAPH_REPORT.md')
 sys.stdout.reconfigure(encoding='utf-8')  # the report has symbols a Windows console code page can't print
 
 try:
-    if importlib.util.find_spec('graphify') is None:
+    # A plain "pip install graphifyy" (what /graphify runs) has no SQL grammar, so check for both
+    if importlib.util.find_spec('graphify') is None or importlib.util.find_spec('tree_sitter_sql') is None:
         subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'graphifyy[sql]'],
                        capture_output=True, timeout=300)
     # --force: rebuild from the current files even if the graph shrank (code was deleted)

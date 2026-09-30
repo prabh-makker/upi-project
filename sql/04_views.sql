@@ -2,12 +2,15 @@
 -- python/load_to_mysql.py re-creates these after every load. In Power BI, connect to MySQL
 -- and pick these views instead of the raw tables.
 
--- Monthly UPI growth: MoM, YoY, average ticket size, fiscal year
+-- Monthly UPI growth: MoM, YoY, average ticket size, fiscal year, season
 CREATE OR REPLACE VIEW vw_upi_growth AS
 SELECT month_date,
        CASE WHEN MONTH(month_date) >= 4
             THEN CONCAT(YEAR(month_date), '-', RIGHT(YEAR(month_date) + 1, 2))
             ELSE CONCAT(YEAR(month_date) - 1, '-', RIGHT(YEAR(month_date), 2)) END AS fiscal_year,
+       CASE WHEN MONTH(month_date) IN (10, 11) THEN 'Oct-Nov (festive)'
+            WHEN MONTH(month_date) = 3 THEN 'March (year end)'
+            ELSE 'Other months' END AS season,
        banks_live, volume_mn, value_cr,
        ROUND(value_cr * 10 / NULLIF(volume_mn, 0), 2) AS avg_ticket_rs,
        ROUND(100 * (volume_mn / NULLIF(LAG(volume_mn, 1)  OVER (ORDER BY month_date), 0) - 1), 2) AS mom_growth_pct,
@@ -42,7 +45,7 @@ SELECT month_date, app_name, total_volume_mn, total_value_cr,
        RANK() OVER (PARTITION BY month_date ORDER BY total_volume_mn DESC) AS app_rank
 FROM app_monthly;
 
--- Data health page: results of the latest quality-check run, plus the latest load per table
+-- Data health page: results of the latest quality-check run (vw_data_health) and every load in etl_run_log (vw_load_history)
 CREATE OR REPLACE VIEW vw_data_health AS
 SELECT q.run_time, q.check_name, q.table_name, q.status, q.failed_rows, q.rule
 FROM dq_results q

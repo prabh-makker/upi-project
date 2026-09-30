@@ -14,7 +14,7 @@ Database: `upi_db` (MySQL 8). Loaded by `python python/load_to_mysql.py`.
 | `bank_monthly` | month x remitter bank (top 50) | Jan 2025, Sep 2025 to Aug 2026 | NPCI Ecosystem Statistics > Top 50 Member Performance (Remitter) |
 | `app_monthly` | month x UPI app | Sep 2025 to Aug 2026 | NPCI Ecosystem Statistics > UPI Applications |
 | `chargeback_monthly` | month x beneficiary bank | Sep 2025 to Aug 2026 | NPCI Ecosystem Statistics > Chargeback |
-| `dim_bank` | bank | n/a | Hand-made lookup in `data/reference/bank_type.csv` (Public / Private / Small finance / Payments / Regional rural / Cooperative / Foreign / Card issuer) |
+| `dim_bank` | bank | n/a | Hand-made lookup in `data/reference/bank_type.csv`. bank_type is one of: Public, Private, Small finance bank, Payments bank, Regional rural bank, Cooperative, Foreign, Card issuer / non-bank |
 | `etl_run_log` | table loaded per run | all runs | written by the loader |
 | `dq_results` | quality check per run | all runs | written by `sql/03_quality_checks.sql` |
 | `upi_forecast` | month (actual, test or future) | Apr 2016 to 6 months past the latest | written by `python/forecast.py` |
@@ -32,11 +32,11 @@ Database: `upi_db` (MySQL 8). Loaded by `python python/load_to_mysql.py`.
 | bank_monthly | month_date | DATE | Month | date |
 | bank_monthly | rank_no | INT | NPCI's rank by volume that month (1 = biggest) | 1-50 |
 | bank_monthly | bank_name | VARCHAR | Remitter (payer's) bank, upper case, "Ltd./Limited" removed | |
-| bank_monthly | volume_mn | DECIMAL | Transactions sent by the bank's customers | million |
+| bank_monthly | volume_mn | DECIMAL | Transactions the bank's customers tried to send, including declined ones (approved + BD + TD = 100% of it), so the top 50 add up to more than upi_monthly.volume_mn | million |
 | bank_monthly | approved_pct | DECIMAL | Share of those transactions that went through | % (0-100) |
 | bank_monthly | bd_pct | DECIMAL | Business declines: failed for customer-side reasons (wrong PIN, low balance, limit) | % |
 | bank_monthly | td_pct | DECIMAL | Technical declines: failed because the bank's or a partner's system failed | % |
-| bank_monthly | debit_reversal_mn | DECIMAL | Money debited but the payment failed, so it had to be reversed | million |
+| bank_monthly | debit_reversal_mn | DECIMAL | Number of payments where the customer was debited but the payment failed, so the debit had to be reversed | million (count) |
 | bank_monthly | debit_reversal_success_pct | DECIMAL | Share of those reversals that succeeded | % |
 | app_monthly | app_name | VARCHAR | UPI app (PHONE PE, GOOGLE PAY, PAYTM, ...) | |
 | app_monthly | customer_volume_mn / customer_value_cr | DECIMAL | Customer-initiated transactions | million / Rs crore |
@@ -66,7 +66,7 @@ Database: `upi_db` (MySQL 8). Loaded by `python python/load_to_mysql.py`.
 
 | View | What it gives |
 |---|---|
-| `vw_upi_growth` | Monthly volume, value, fiscal year, avg ticket, MoM % and YoY % |
+| `vw_upi_growth` | Monthly volume, value, fiscal year, season (Oct-Nov festive / March year end / other), avg ticket, MoM % and YoY % |
 | `vw_bank_scorecard` | Bank x month with bank type, est. failed txns, industry weighted TD % and gap to it, rank |
 | `vw_app_share` | App x month with volume and value share %, rank |
 | `vw_data_health` | Latest quality-check results |
@@ -82,7 +82,7 @@ Database: `upi_db` (MySQL 8). Loaded by `python python/load_to_mysql.py`.
 | Weighted tech decline % | SUM(volume_mn x td_pct) / SUM(volume_mn) | Fair industry average; big banks count more |
 | Estimated failed txns (mn) | volume_mn x td_pct / 100 | Real size of the bank-side failure problem |
 | App share % | app total_volume_mn / SUM over all apps that month x 100 | Market concentration |
-| Top-2 app share % | share of the two biggest apps | NPCI's proposed 30% market cap is about this |
+| Top-2 app share % | share of the two biggest apps | Market concentration. NPCI's proposed cap is 30% per app, so check each App share % against it |
 | Chargeback ratio % | chargebacks_received / total_txns x 100 | Dispute rate at the receiving bank |
 | Forecast error (MAPE) % | average of abs(actual - forecast) / actual x 100 over a test window | How far off the volume forecast is, on months it never saw |
 
@@ -91,8 +91,8 @@ Database: `upi_db` (MySQL 8). Loaded by `python python/load_to_mysql.py`.
 Run after every load; results go to `dq_results`. PASS / WARN / FAIL per check:
 percentages between 0 and 100, approved + BD + TD = 100, no empty key values, one row per bank
 per month, 50 banks per month, app count doesn't drop more than 10%, no missing months, latest
-month at most 3 months old, app totals within 5% of the overall monthly volume, and chargeback
-totals within 15% of it.
+month at most 3 months old, app totals within 5% of the overall monthly volume, chargeback
+totals within 15% of it, and every bank in `bank_monthly` has a type in `dim_bank`.
 
 ## Known limitations
 

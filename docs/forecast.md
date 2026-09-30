@@ -17,8 +17,10 @@ How many UPI transactions will there be each month for the next 6 months (Sep 20
 - **Data:** `upi_monthly.volume_mn`, one row per month, from MySQL.
 - **Feature:** month number (1, 2, 3, ...). Target: that month's volume in millions.
 - **Training window:** the 36 months before each test. UPI grew far faster in its early years
-  (and dipped in 2020), so older months would pull the line the wrong way. On the latest
-  6-month test, 24 months gave about the same error as 36, while 48 and 60 months were worse.
+  (and dipped in 2020), so older months pull the line the wrong way. Averaged over the 5 test
+  windows, the straight line's error was 4.0% with 36 months, 6.5% with 48 and 10.5% with 60.
+  24 months scored 3.0% and forecasts almost the same (within 0.3%). 36 is kept anyway, because
+  picking whichever length scores best on the test windows would make the test error look better than it is.
 - **3 models compared:**
   1. **Naive:** every future month = the last known month (the baseline to beat)
   2. **Linear trend:** `LinearRegression` on month number, so volume grows by the same number of
@@ -58,8 +60,8 @@ assumes the old fast growth continues, so it over-predicts.
 
 ## Limitations
 
-- It only uses time, so it ignores the March year-end spike and the Oct-Nov festive bump
-  (see Q5 in `sql/02_analysis_queries.sql`). Those months will be above the line.
+- It only uses time, so it ignores the March jump (2 to 3 more days than February) and the
+  Oct-Nov festive bump (see Q5 in `sql/02_analysis_queries.sql`). Those months will be above the line.
 - It can't know about shocks such as a policy change, an outage or a new UPI charge.
 - 6 months ahead only. Past that, the slowdown in growth matters more than a straight line can show.
 
@@ -70,6 +72,7 @@ assumes the old fast growth continues, so it over-predicts.
 | MySQL `upi_forecast` | One row per month: `row_type` actual / test / future, actual and forecast volume, low and high |
 | MySQL `forecast_eval` | Every model x test window with MAE and MAPE |
 | `powerbi/data/upi_forecast.csv` | Same as `upi_forecast`, for Power BI if MySQL won't connect |
+| `powerbi/data/forecast_eval.csv` | Same as `forecast_eval`, for Power BI if MySQL won't connect |
 | `findings/forecast.png` | The chart above |
 
 ## Bank reliability tiers (K-Means): tried, not used

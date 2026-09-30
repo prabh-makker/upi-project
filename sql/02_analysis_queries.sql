@@ -36,10 +36,8 @@ WHERE fiscal_year >= '2024-25'
 ORDER BY month_date;
 
 -- Q5. Festive season: is Oct-Nov (Diwali) and March (year end) growth higher than other months?
-SELECT CASE WHEN MONTH(month_date) IN (10, 11) THEN 'Oct-Nov (festive)'
-            WHEN MONTH(month_date) = 3 THEN 'March (year end)'
-            ELSE 'Other months' END AS season,
-       COUNT(*)                     AS months,
+SELECT season,
+       COUNT(*)                      AS months,
        ROUND(AVG(mom_growth_pct), 2) AS avg_mom_growth_pct
 FROM vw_upi_growth
 WHERE month_date >= '2019-04-01'

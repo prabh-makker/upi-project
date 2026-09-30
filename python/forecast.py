@@ -12,8 +12,8 @@ How it works:
 3. Repeats that test on 4 earlier 6-month windows, so one lucky window can't pick the winner
 4. Takes the model with the lowest average error (MAPE), retrains it on the latest 36 months
    and forecasts the next 6 months, with a low/high range based on its average test error
-5. Saves the results to MySQL (upi_forecast, forecast_eval), powerbi/data/upi_forecast.csv
-   and a chart at findings/forecast.png
+5. Saves the results to MySQL (upi_forecast, forecast_eval), CSV copies of both in powerbi/data/
+   (upi_forecast.csv, forecast_eval.csv) and a chart at findings/forecast.png
 
 Run from the project root, after the loader:
     python python/forecast.py
@@ -23,15 +23,16 @@ import os
 import sys
 
 import matplotlib
-matplotlib.use('Agg')  # save the chart to a file, no window needed
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-from sklearn.linear_model import LinearRegression  # noqa: E402
-from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error  # noqa: E402
-from sqlalchemy import text  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error
+from sqlalchemy import text
 
-from load_to_mysql import POWERBI_DIR, ROOT, get_settings, make_engine  # noqa: E402
+from load_to_mysql import POWERBI_DIR, ROOT, get_settings, make_engine
+
+matplotlib.use('Agg')  # save the chart to a file, no window needed
 
 TRAIN_MONTHS = 36   # the last 3 years; UPI grew much faster before that, so older months mislead
 HORIZON = 6         # months in each test, and months to forecast
@@ -131,6 +132,7 @@ def main():
     evals.to_sql('forecast_eval', engine, if_exists='replace', index=False)
     os.makedirs(POWERBI_DIR, exist_ok=True)
     out.to_csv(os.path.join(POWERBI_DIR, 'upi_forecast.csv'), index=False)
+    evals.to_csv(os.path.join(POWERBI_DIR, 'forecast_eval.csv'), index=False)
     engine.dispose()
 
     # 4. Chart: last 4 years of actuals, the test window and the forecast
@@ -152,8 +154,8 @@ def main():
     ax.legend(loc='upper left')
     fig.savefig(CHART_PATH, dpi=120, bbox_inches='tight')
 
-    print("\nSaved: MySQL tables upi_forecast and forecast_eval, "
-          "powerbi/data/upi_forecast.csv and findings/forecast.png")
+    print("\nSaved: MySQL tables upi_forecast and forecast_eval, the same two tables as CSV in powerbi/data/ "
+          "and findings/forecast.png")
 
 
 if __name__ == '__main__':

@@ -44,6 +44,7 @@ Output:
                                    cb_ratio_pct, source_file)
 - data/processed/app_monthly.csv  (month_date, app_name, <customer|b2c|b2b|onus|total>_volume_mn and
                                    _value_cr, source_file)
+- data/processed/dim_bank.csv     (bank_name, bank_type), copied from data/reference/bank_type.csv
 """
 
 import glob
@@ -73,7 +74,7 @@ COLUMN_MAP = {
 
 
 def to_number(series):
-    """'29,82,355.95' -> 2982355.95"""
+    """'29,82,355.95' -> 2982355.95; '-' or any other non-number -> NaN"""
     return pd.to_numeric(series.astype(str).str.replace(',', '').str.replace('%', '').str.strip(), errors='coerce')
 
 
@@ -154,7 +155,7 @@ def read_bank_file(path):
 
     df['bank_name'] = clean_name(df['bank_name'])
     for col in df.columns.drop('bank_name'):
-        df[col] = to_number(df[col].replace('-', None))
+        df[col] = to_number(df[col])
     df['rank_no'] = df['rank_no'].astype('Int64')
     # One scale per file, read from approved_pct (about 90+ when in %): a column like td_pct can
     # be under 1 in both scales, so checking each column on its own could multiply it by 100

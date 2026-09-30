@@ -7,12 +7,19 @@ Cleaning Rules:
 - RBI: Parse dates, convert numerics, validate ranges, remove duplicates
 
 Output:
-- /mnt/project-files/upi-project/data/processed/npci_upi_clean.csv
-- /mnt/project-files/upi-project/data/processed/rbi_settlement_clean.csv
+- data/processed/npci_upi_clean.csv
+- data/processed/rbi_settlement_clean.csv
 """
+
+import os
 
 import pandas as pd
 import numpy as np
+
+# Paths are relative to the repo, so this runs the same on Windows and Linux
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RAW_DIR = os.path.join(ROOT, 'data', 'raw')
+PROCESSED_DIR = os.path.join(ROOT, 'data', 'processed')
 
 def clean_npci_data(input_path, output_path):
     """Clean NPCI UPI data"""
@@ -84,24 +91,26 @@ def clean_rbi_data(input_path, output_path):
 
     return rows_before, len(df), df
 
-if __name__ == '__main__':
-    # Create processed directory
-    import os
-    os.makedirs('/mnt/project-files/upi-project/data/processed', exist_ok=True)
+def main():
+    os.makedirs(PROCESSED_DIR, exist_ok=True)
 
     # Clean NPCI data
     npci_before, npci_after, df_npci = clean_npci_data(
-        '/mnt/project-files/upi-project/data/raw/npci_upi_data.csv',
-        '/mnt/project-files/upi-project/data/processed/npci_upi_clean.csv'
+        os.path.join(RAW_DIR, 'npci_upi_data.csv'),
+        os.path.join(PROCESSED_DIR, 'npci_upi_clean.csv')
     )
 
     # Clean RBI data
     rbi_before, rbi_after, df_rbi = clean_rbi_data(
-        '/mnt/project-files/upi-project/data/raw/rbi_settlement_data.csv',
-        '/mnt/project-files/upi-project/data/processed/rbi_settlement_clean.csv'
+        os.path.join(RAW_DIR, 'rbi_settlement_data.csv'),
+        os.path.join(PROCESSED_DIR, 'rbi_settlement_clean.csv')
     )
 
     # Print summary
     print("Data Cleaning Summary:")
     print(f"NPCI: {npci_before} -> {npci_after} rows ({npci_before - npci_after} removed)")
     print(f"RBI: {rbi_before} -> {rbi_after} rows ({rbi_before - rbi_after} removed)")
+
+
+if __name__ == '__main__':
+    main()

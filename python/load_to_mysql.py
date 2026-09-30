@@ -1,14 +1,15 @@
 """
 Load to MySQL - Phase 3
-Loads every CSV in data/processed into a fresh MySQL database, using Python only
+Cleans the raw files and loads them into a fresh MySQL database, using Python only
 (no mysql command line, no LOAD DATA INFILE).
 
 What it does:
 1. Reads MySQL login details from the .env file in the project root
-2. If data/processed has no CSVs yet, runs data_cleaning.py first
+2. Runs data_cleaning.py (data/raw -> data/processed)
 3. Drops and re-creates the database (default: upi_db), so re-running is always safe
-4. Creates one table per CSV (npci_upi_clean.csv -> table npci_upi_clean) and loads it
-5. Prints row counts and a sample query, which proves Python is talking to MySQL
+4. Runs sql/01_schema.sql to create the tables
+5. Loads every CSV in data/processed into the table with the same name
+6. Prints row counts and a sample query, which proves Python is talking to MySQL
 
 Run from the project root:
     python python/load_to_mysql.py
@@ -23,8 +24,12 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import URL
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import data_cleaning  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROCESSED_DIR = os.path.join(ROOT, 'data', 'processed')
+SCHEMA_FILE = os.path.join(ROOT, 'sql', '01_schema.sql')
 
 
 def get_settings():
@@ -49,20 +54,6 @@ def make_engine(s, database=None):
     return create_engine(url)
 
 
-def ensure_processed_csvs():
-    """Return the processed CSVs, running the cleaning step first if there are none"""
-    csvs = sorted(glob.glob(os.path.join(PROCESSED_DIR, '*.csv')))
-    if not csvs:
-        print("No CSVs in data/processed yet, running data_cleaning.py first...")
-        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        import data_cleaning
-        data_cleaning.main()
-        csvs = sorted(glob.glob(os.path.join(PROCESSED_DIR, '*.csv')))
-    if not csvs:
-        sys.exit("Still no CSVs in data/processed. Check data/raw.")
-    return csvs
-
-
 def recreate_database(s):
     """Drop and create the database fresh"""
     server = make_engine(s)
@@ -79,27 +70,46 @@ def recreate_database(s):
     print(f"Created fresh database: {s['db']}")
 
 
-def load_csv(engine, path):
-    """Load one CSV into a table named after the file"""
+def run_schema(engine):
+    """Run each statement in sql/01_schema.sql"""
+    with open(SCHEMA_FILE, encoding='utf-8') as f:
+        lines = [line for line in f if not line.strip().startswith('--')]
+    statements = [stmt.strip() for stmt in ''.join(lines).split(';') if stmt.strip()]
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+    print(f"Ran sql/01_schema.sql ({len(statements)} statements)")
+
+
+def load_csv(engine, path, existing_tables):
+    """Load one CSV into the table named after the file"""
     table = os.path.splitext(os.path.basename(path))[0].lower()
     df = pd.read_csv(path)
     # Columns with 'date' in the name become real DATE columns in MySQL
     for col in df.columns:
         if 'date' in col.lower():
             df[col] = pd.to_datetime(df[col]).dt.date
-    df.to_sql(table, engine, if_exists='replace', index=False, chunksize=1000)
+    # Tables from 01_schema.sql keep their types and keys; any other CSV gets a new table
+    mode = 'append' if table in existing_tables else 'replace'
+    df.to_sql(table, engine, if_exists=mode, index=False, chunksize=1000)
     return table, len(df)
 
 
 def main():
     s = get_settings()
-    csvs = ensure_processed_csvs()
-    recreate_database(s)
 
+    print("Cleaning raw files...")
+    data_cleaning.main()
+    csvs = sorted(glob.glob(os.path.join(PROCESSED_DIR, '*.csv')))
+
+    recreate_database(s)
     engine = make_engine(s, s['db'])
+    run_schema(engine)
+    existing_tables = set(inspect(engine).get_table_names())
+
     loaded = {}
     for path in csvs:
-        table, rows = load_csv(engine, path)
+        table, rows = load_csv(engine, path, existing_tables)
         loaded[table] = rows
         print(f"Loaded {rows:>6} rows from {os.path.basename(path)} into table {table}")
 
@@ -111,24 +121,16 @@ def main():
             db_rows = conn.execute(text(f"SELECT COUNT(*) FROM `{table}`")).scalar()
             status = 'OK' if db_rows == rows else 'MISMATCH'
             all_ok = all_ok and db_rows == rows
-            print(f"  {table:<28} csv={rows:<6} mysql={db_rows:<6} {status}")
+            print(f"  {table:<20} csv={rows:<6} mysql={db_rows:<6} {status}")
 
-    print("\nColumns per table:")
-    insp = inspect(engine)
-    for table in loaded:
-        cols = [f"{c['name']} ({c['type']})" for c in insp.get_columns(table)]
-        print(f"  {table}: {', '.join(cols)}")
-
-    if 'npci_upi_clean' in loaded:
-        print("\nSample query (monthly totals from npci_upi_clean):")
+    if 'upi_monthly' in loaded:
+        print("\nSample query (last 6 months in upi_monthly):")
         sample = pd.read_sql(text("""
-            SELECT `year`, `month`,
-                   SUM(transaction_count) AS total_txn,
-                   ROUND(SUM(transaction_value_crores), 2) AS total_value_cr,
-                   ROUND(AVG(success_rate_percent), 2) AS avg_success_rate
-            FROM npci_upi_clean
-            GROUP BY `year`, `month`
-            ORDER BY `year`, `month`
+            SELECT month_date, banks_live, volume_mn, value_cr,
+                   ROUND(value_cr * 10 / volume_mn, 2) AS avg_ticket_rs
+            FROM upi_monthly
+            ORDER BY month_date DESC
+            LIMIT 6
         """), engine)
         print(sample.to_string(index=False))
 
@@ -136,6 +138,7 @@ def main():
     if not all_ok:
         sys.exit("\nSome row counts did not match. See above.")
     print(f"\nDone. Python is connected to MySQL and all tables are in {s['db']}.")
+    print("Next: open sql/02_analysis_queries.sql in MySQL Workbench and run it.")
 
 
 if __name__ == '__main__':

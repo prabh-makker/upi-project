@@ -1,115 +1,117 @@
 """
-Data Cleaning Script - Phase 2
-Cleans NPCI UPI data and RBI Settlement data
+Data Cleaning - Phase 2
+Combines the monthly UPI files in data/raw into one clean table.
 
-Cleaning Rules:
-- NPCI: Parse dates, standardize bank names, convert numerics, validate ranges, remove duplicates
-- RBI: Parse dates, convert numerics, validate ranges, remove duplicates
+Input (data/raw):
+- npci_upi_monthly_FY*.xlsx   Downloaded from the NPCI UPI product statistics page, one file per
+                              financial year. Months look like "August-2026".
+- upi_monthly_*.csv           Monthly UPI table covering Apr-2016 to Aug-2025. Months look like
+                              "Aug-25". Its computed columns (average ticket, MoM growth) are
+                              dropped here and recalculated in SQL.
+
+Cleaning rules:
+- Month text -> real date (1st of the month)
+- Numbers like "29,82,355.95" (Indian commas) -> 2982355.95
+- Same month in two files -> keep the NPCI download
+- Report any missing months between the first and last month
 
 Output:
-- data/processed/npci_upi_clean.csv
-- data/processed/rbi_settlement_clean.csv
+- data/processed/upi_monthly.csv  (month_date, banks_live, volume_mn, value_cr, source_file)
 """
 
+import glob
 import os
 
 import pandas as pd
-import numpy as np
 
 # Paths are relative to the repo, so this runs the same on Windows and Linux
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW_DIR = os.path.join(ROOT, 'data', 'raw')
 PROCESSED_DIR = os.path.join(ROOT, 'data', 'processed')
 
-def clean_npci_data(input_path, output_path):
-    """Clean NPCI UPI data"""
-    df = pd.read_csv(input_path)
-    rows_before = len(df)
+# Raw column name -> clean column name
+COLUMN_MAP = {
+    'month': 'month',
+    'no. of banks live on upi': 'banks_live',
+    'volume (in mn.)': 'volume_mn',
+    'volume (in mn)': 'volume_mn',
+    'value (in cr.)': 'value_cr',
+}
 
-    # 1. Fix dates
-    df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d')
-    df['year'] = df['date'].dt.year
-    df['month'] = df['date'].dt.month
-    df['day'] = df['date'].dt.day
-    df['quarter'] = df['date'].dt.quarter
-    df['day_of_week'] = df['date'].dt.dayofweek
 
-    # 2. Standardize bank names
-    df['bank_name'] = df['bank_name'].str.strip().str.upper()
+def to_number(series):
+    """'29,82,355.95' -> 2982355.95"""
+    return pd.to_numeric(series.astype(str).str.replace(',', '').str.strip(), errors='coerce')
 
-    # 3. Convert numeric columns
-    df['transaction_count'] = pd.to_numeric(df['transaction_count'], errors='coerce')
-    df['transaction_value_crores'] = pd.to_numeric(df['transaction_value_crores'], errors='coerce').round(2)
-    df['success_rate_percent'] = pd.to_numeric(df['success_rate_percent'], errors='coerce').round(2)
 
-    # 4. Remove rows with null critical values
-    df = df.dropna(subset=['date', 'bank_name', 'transaction_count'])
+def parse_month(series):
+    """'August-2026' or 'Aug-25' -> 2026-08-01 / 2025-08-01"""
+    text = series.astype(str).str.strip()
+    parsed = pd.to_datetime(text, format='%B-%Y', errors='coerce')
+    parsed = parsed.fillna(pd.to_datetime(text, format='%b-%y', errors='coerce'))
+    return parsed
 
-    # 5. Validate ranges
-    df = df[df['success_rate_percent'].between(95, 100, inclusive='both')]
-    df = df[df['transaction_count'] > 0]
 
-    # 6. Remove duplicates
-    df = df.drop_duplicates(subset=['date', 'bank_name'])
+def read_raw_file(path):
+    if path.lower().endswith('.xlsx'):
+        df = pd.read_excel(path, dtype=str)
+    else:
+        df = pd.read_csv(path, dtype=str)
+    df.columns = [c.strip().lower() for c in df.columns]
+    df = df.rename(columns=COLUMN_MAP)[['month', 'banks_live', 'volume_mn', 'value_cr']]
+    df = df.dropna(how='all')
 
-    # 7. Sort by date and bank
-    df = df.sort_values(['date', 'bank_name']).reset_index(drop=True)
+    df['month_date'] = parse_month(df['month'])
+    bad = df['month_date'].isna()
+    if bad.any():
+        print(f"  {os.path.basename(path)}: skipped {bad.sum()} rows with an unreadable month: "
+              f"{df.loc[bad, 'month'].tolist()}")
+    df = df[~bad]
 
-    df.to_csv(output_path, index=False)
+    df['banks_live'] = to_number(df['banks_live']).astype('Int64')
+    df['volume_mn'] = to_number(df['volume_mn']).round(2)
+    df['value_cr'] = to_number(df['value_cr']).round(2)
+    df['source_file'] = os.path.basename(path)
+    # NPCI downloads win when two files have the same month
+    df['priority'] = 0 if os.path.basename(path).startswith('npci_') else 1
+    return df[['month_date', 'banks_live', 'volume_mn', 'value_cr', 'source_file', 'priority']]
 
-    return rows_before, len(df), df
-
-def clean_rbi_data(input_path, output_path):
-    """Clean RBI Settlement data"""
-    df = pd.read_csv(input_path)
-    rows_before = len(df)
-
-    # 1. Fix dates
-    df['settlement_date'] = pd.to_datetime(df['settlement_date'], format='%Y-%m-%d')
-
-    # 2. Convert numeric columns
-    df['settlement_value_crores'] = pd.to_numeric(df['settlement_value_crores'], errors='coerce').round(2)
-    df['transaction_count_millions'] = pd.to_numeric(df['transaction_count_millions'], errors='coerce').round(2)
-    df['banks_involved'] = pd.to_numeric(df['banks_involved'], errors='coerce').astype('Int64')
-    df['neft_transactions'] = pd.to_numeric(df['neft_transactions'], errors='coerce').round(0)
-    df['rtgs_transactions'] = pd.to_numeric(df['rtgs_transactions'], errors='coerce').round(0)
-
-    # 3. Remove nulls in critical columns
-    df = df.dropna(subset=['settlement_date', 'settlement_value_crores'])
-
-    # 4. Validate ranges
-    df = df[df['settlement_value_crores'] > 0]
-    df = df[df['banks_involved'] > 10]
-
-    # 5. Remove duplicates
-    df = df.drop_duplicates(subset=['settlement_date'])
-
-    # 6. Sort
-    df = df.sort_values('settlement_date').reset_index(drop=True)
-
-    df.to_csv(output_path, index=False)
-
-    return rows_before, len(df), df
 
 def main():
+    files = sorted(glob.glob(os.path.join(RAW_DIR, '*.xlsx')) + glob.glob(os.path.join(RAW_DIR, '*.csv')))
+    if not files:
+        raise SystemExit(f"No .xlsx or .csv files in {RAW_DIR}")
+
+    frames = []
+    for path in files:
+        df = read_raw_file(path)
+        print(f"  {os.path.basename(path)}: {len(df)} months "
+              f"({df['month_date'].min():%b-%Y} to {df['month_date'].max():%b-%Y})")
+        frames.append(df)
+
+    df = pd.concat(frames, ignore_index=True)
+    rows_before = len(df)
+    df = (df.sort_values(['month_date', 'priority'])
+            .drop_duplicates(subset='month_date', keep='first')
+            .drop(columns='priority')
+            .sort_values('month_date')
+            .reset_index(drop=True))
+    print(f"Combined: {rows_before} rows -> {len(df)} unique months "
+          f"({rows_before - len(df)} duplicate months dropped)")
+
+    all_months = pd.date_range(df['month_date'].min(), df['month_date'].max(), freq='MS')
+    missing = all_months.difference(df['month_date'])
+    if len(missing):
+        print(f"Missing months ({len(missing)}): {', '.join(m.strftime('%b-%Y') for m in missing)}")
+
     os.makedirs(PROCESSED_DIR, exist_ok=True)
-
-    # Clean NPCI data
-    npci_before, npci_after, df_npci = clean_npci_data(
-        os.path.join(RAW_DIR, 'npci_upi_data.csv'),
-        os.path.join(PROCESSED_DIR, 'npci_upi_clean.csv')
-    )
-
-    # Clean RBI data
-    rbi_before, rbi_after, df_rbi = clean_rbi_data(
-        os.path.join(RAW_DIR, 'rbi_settlement_data.csv'),
-        os.path.join(PROCESSED_DIR, 'rbi_settlement_clean.csv')
-    )
-
-    # Print summary
-    print("Data Cleaning Summary:")
-    print(f"NPCI: {npci_before} -> {npci_after} rows ({npci_before - npci_after} removed)")
-    print(f"RBI: {rbi_before} -> {rbi_after} rows ({rbi_before - rbi_after} removed)")
+    # Clear old outputs so the loader never picks up stale files
+    for old in glob.glob(os.path.join(PROCESSED_DIR, '*.csv')):
+        os.remove(old)
+    df['month_date'] = df['month_date'].dt.date
+    out = os.path.join(PROCESSED_DIR, 'upi_monthly.csv')
+    df.to_csv(out, index=False)
+    print(f"Saved {out}")
 
 
 if __name__ == '__main__':

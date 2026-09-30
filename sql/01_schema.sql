@@ -14,6 +14,7 @@ CREATE TABLE upi_monthly (
 
 CREATE TABLE bank_monthly (
     month_date                  DATE          NOT NULL COMMENT '1st day of the month',
+    rank_no                     INT           NOT NULL COMMENT 'NPCI rank by volume that month (1-50)',
     bank_name                   VARCHAR(120)  NOT NULL COMMENT 'Remitter (payer) bank, as NPCI names it',
     volume_mn                   DECIMAL(12,2) NOT NULL COMMENT 'Transactions sent, in millions',
     approved_pct                DECIMAL(5,2)  NULL COMMENT 'Share approved, 0-100',
@@ -22,7 +23,8 @@ CREATE TABLE bank_monthly (
     debit_reversal_mn           DECIMAL(10,2) NULL COMMENT 'Debit reversals, in millions',
     debit_reversal_success_pct  DECIMAL(5,2)  NULL COMMENT 'Share of debit reversals that succeeded, 0-100',
     source_file                 VARCHAR(150)  NOT NULL COMMENT 'Raw file this row came from',
-    PRIMARY KEY (month_date, bank_name)
+    PRIMARY KEY (month_date, rank_no),
+    INDEX idx_bank (bank_name)
 );
 
 CREATE TABLE chargeback_monthly (
@@ -36,4 +38,21 @@ CREATE TABLE chargeback_monthly (
     cb_ratio_pct          DECIMAL(12,6) NULL COMMENT 'chargebacks_received / total_txns * 100',
     source_file           VARCHAR(150)  NOT NULL COMMENT 'Raw file this row came from',
     PRIMARY KEY (month_date, bank_code)
+);
+
+CREATE TABLE app_monthly (
+    month_date          DATE          NOT NULL COMMENT '1st day of the month',
+    app_name            VARCHAR(120)  NOT NULL COMMENT 'UPI app (PhonePe, Google Pay, ...)',
+    customer_volume_mn  DECIMAL(12,2) NULL COMMENT 'Customer-initiated transactions, millions',
+    customer_value_cr   DECIMAL(14,2) NULL COMMENT 'Customer-initiated value, Rs crore',
+    b2c_volume_mn       DECIMAL(12,2) NULL,
+    b2c_value_cr        DECIMAL(14,2) NULL,
+    b2b_volume_mn       DECIMAL(12,2) NULL,
+    b2b_value_cr        DECIMAL(14,2) NULL,
+    onus_volume_mn      DECIMAL(12,2) NULL COMMENT 'On-us (same bank both sides), millions',
+    onus_value_cr       DECIMAL(14,2) NULL,
+    total_volume_mn     DECIMAL(12,2) NOT NULL COMMENT 'All transactions through the app, millions',
+    total_value_cr      DECIMAL(14,2) NOT NULL COMMENT 'All value through the app, Rs crore',
+    source_file         VARCHAR(150)  NOT NULL COMMENT 'Raw file this row came from',
+    PRIMARY KEY (month_date, app_name)
 );

@@ -70,3 +70,33 @@ SELECT bank_name,
 FROM bank_monthly
 GROUP BY bank_name
 ORDER BY total_volume_mn DESC;
+
+-- Q8: App market share by month (PhonePe, Google Pay, Paytm, ...)
+SELECT month_date, app_name, total_volume_mn,
+       ROUND(100 * total_volume_mn / SUM(total_volume_mn) OVER (PARTITION BY month_date), 2) AS share_pct,
+       RANK() OVER (PARTITION BY month_date ORDER BY total_volume_mn DESC) AS app_rank
+FROM app_monthly
+ORDER BY month_date, app_rank
+LIMIT 50;
+
+-- Q9: Concentration risk: share of volume held by the top 2 apps each month
+SELECT month_date,
+       ROUND(100 * SUM(CASE WHEN app_rank <= 2 THEN total_volume_mn END) / SUM(total_volume_mn), 2) AS top2_share_pct
+FROM (
+    SELECT month_date, total_volume_mn,
+           RANK() OVER (PARTITION BY month_date ORDER BY total_volume_mn DESC) AS app_rank
+    FROM app_monthly
+) t
+GROUP BY month_date
+ORDER BY month_date;
+
+-- Q10: Banks with the highest chargeback ratio (disputes per transaction), big banks only
+SELECT bank_name,
+       SUM(total_txns)            AS total_txns,
+       SUM(chargebacks_received)  AS chargebacks,
+       ROUND(100 * SUM(chargebacks_received) / SUM(total_txns), 5) AS cb_ratio_pct
+FROM chargeback_monthly
+GROUP BY bank_name
+HAVING SUM(total_txns) >= 1000000000
+ORDER BY cb_ratio_pct DESC
+LIMIT 10;

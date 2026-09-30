@@ -7,8 +7,7 @@ __pycache__/
 *.pyc
 .env
 
-# Power BI
-*.pbix
+# Power BI (the .pbix is committed so recruiters can open it)
 
 # Jupyter
 .ipynb_checkpoints/
@@ -16,3 +15,6 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+
+# Power BI CSV exports (made by the loader)
+powerbi/data/

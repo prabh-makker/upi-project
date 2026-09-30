@@ -40,4 +40,6 @@ creates the Power BI views (`sql/04_views.sql`), and runs 12 data quality checks
 Safe to re-run any time, for example after adding a new NPCI file to `data/raw`.
 Then run `sql/02_analysis_queries.sql` (18 business questions) in MySQL Workbench.
 
+Power BI dashboard, step by step: [powerbi/POWERBI_GUIDE.md](powerbi/POWERBI_GUIDE.md).
+
 Column meanings, KPI formulas and known limitations: [docs/data_dictionary.md](docs/data_dictionary.md).

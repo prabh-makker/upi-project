@@ -32,6 +32,8 @@ import data_cleaning  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROCESSED_DIR = os.path.join(ROOT, 'data', 'processed')
+POWERBI_DIR = os.path.join(ROOT, 'powerbi', 'data')
+POWERBI_VIEWS = ['vw_upi_growth', 'vw_bank_scorecard', 'vw_app_share', 'vw_data_health', 'vw_load_history']
 SQL_DIR = os.path.join(ROOT, 'sql')
 
 
@@ -162,6 +164,12 @@ def main():
     print(dq.to_string(index=False))
     failed = (dq['status'] == 'FAIL').sum()
     print(f"{(dq['status'] == 'PASS').sum()} passed, {(dq['status'] == 'WARN').sum()} warnings, {failed} failed")
+
+    # CSV copies of the Power BI views, for Get Data > Text/CSV if the MySQL connector gives trouble
+    os.makedirs(POWERBI_DIR, exist_ok=True)
+    for view in POWERBI_VIEWS:
+        pd.read_sql(text(f"SELECT * FROM {view}"), engine).to_csv(os.path.join(POWERBI_DIR, f"{view}.csv"), index=False)
+    print(f"\nSaved {len(POWERBI_VIEWS)} view exports to powerbi/data/ (backup for Power BI)")
 
     if 'upi_monthly' in loaded:
         print("\nSample query (last 6 months in upi_monthly):")

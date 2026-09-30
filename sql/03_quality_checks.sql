@@ -96,3 +96,10 @@ FROM (
     GROUP BY c.month_date
 ) r
 WHERE ABS(cb_vol / upi_vol - 1) > 0.15;
+
+-- 11. Orphans: every bank in bank_monthly should have a bank type in dim_bank
+INSERT INTO dq_results (run_time, check_name, table_name, failed_rows, status, rule)
+SELECT @run_time, 'bank_has_type', 'bank_monthly', COUNT(DISTINCT b.bank_name), IF(COUNT(*) = 0, 'PASS', 'FAIL'),
+       'every bank in bank_monthly is listed in dim_bank (data/reference/bank_type.csv)'
+FROM bank_monthly b LEFT JOIN dim_bank d ON d.bank_name = b.bank_name
+WHERE d.bank_name IS NULL;

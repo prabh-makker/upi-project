@@ -14,6 +14,7 @@ Database: `upi_db` (MySQL 8). Loaded by `python python/load_to_mysql.py`.
 | `bank_monthly` | month x remitter bank (top 50) | Jan 2025, Sep 2025 to Aug 2026 | NPCI Ecosystem Statistics > Top 50 Member Performance (Remitter) |
 | `app_monthly` | month x UPI app | Sep 2025 to Aug 2026 | NPCI Ecosystem Statistics > UPI Applications |
 | `chargeback_monthly` | month x beneficiary bank | Sep 2025 to Aug 2026 | NPCI Ecosystem Statistics > Chargeback |
+| `dim_bank` | bank | n/a | Hand-made lookup in `data/reference/bank_type.csv` (Public / Private / Small finance / Payments / Regional rural / Cooperative / Foreign / Card issuer) |
 | `etl_run_log` | table loaded per run | all runs | written by the loader |
 | `dq_results` | quality check per run | all runs | written by `sql/03_quality_checks.sql` |
 
@@ -48,6 +49,16 @@ Database: `upi_db` (MySQL 8). Loaded by `python python/load_to_mysql.py`.
 | chargeback_monthly | representments | INT | Disputes the bank contested | count |
 | chargeback_monthly | chargebacks_accepted | INT | Disputes the bank accepted | count |
 | chargeback_monthly | cb_ratio_pct | DECIMAL | chargebacks_received / total_txns x 100 (recalculated; NPCI rounds it to 0.000%) | % |
+
+## Views for Power BI (`sql/04_views.sql`)
+
+| View | What it gives |
+|---|---|
+| `vw_upi_growth` | Monthly volume, value, fiscal year, avg ticket, MoM % and YoY % |
+| `vw_bank_scorecard` | Bank x month with bank type, est. failed txns, industry weighted TD % and gap to it, rank |
+| `vw_app_share` | App x month with volume and value share %, rank |
+| `vw_data_health` | Latest quality-check results |
+| `vw_load_history` | Every load from `etl_run_log` |
 
 ## KPIs
 

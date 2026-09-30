@@ -7,6 +7,7 @@ DROP TABLE IF EXISTS upi_monthly;
 DROP TABLE IF EXISTS bank_monthly;
 DROP TABLE IF EXISTS chargeback_monthly;
 DROP TABLE IF EXISTS app_monthly;
+DROP TABLE IF EXISTS dim_bank;
 
 CREATE TABLE upi_monthly (
     month_date   DATE          NOT NULL PRIMARY KEY COMMENT '1st day of the month',
@@ -61,4 +62,9 @@ CREATE TABLE app_monthly (
     total_value_cr      DECIMAL(14,2) NOT NULL COMMENT 'All value through the app, Rs crore',
     source_file         VARCHAR(150)  NOT NULL COMMENT 'Raw file this row came from',
     PRIMARY KEY (month_date, app_name)
+);
+
+CREATE TABLE dim_bank (
+    bank_name  VARCHAR(120) NOT NULL PRIMARY KEY COMMENT 'Same spelling as bank_monthly.bank_name',
+    bank_type  VARCHAR(40)  NOT NULL COMMENT 'Public / Private / Small finance bank / Payments bank / Regional rural bank / Cooperative / Foreign / Card issuer / non-bank'
 );

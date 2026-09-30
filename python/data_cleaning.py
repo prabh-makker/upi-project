@@ -60,6 +60,7 @@ PROCESSED_DIR = os.path.join(ROOT, 'data', 'processed')
 BANK_DIR = os.path.join(RAW_DIR, 'bank_top50')
 CHARGEBACK_DIR = os.path.join(RAW_DIR, 'chargeback')
 APPS_DIR = os.path.join(RAW_DIR, 'upi_apps')
+REFERENCE_DIR = os.path.join(ROOT, 'data', 'reference')
 
 # Raw column name -> clean column name
 COLUMN_MAP = {
@@ -324,6 +325,15 @@ def main():
     if banks is not None:
         out = os.path.join(PROCESSED_DIR, 'bank_monthly.csv')
         banks.to_csv(out, index=False)
+        print(f"Saved {out}")
+
+        # Bank type lookup (Public / Private / Small finance / ...), kept by hand in data/reference
+        dim = pd.read_csv(os.path.join(REFERENCE_DIR, 'bank_type.csv'))
+        missing = sorted(set(banks['bank_name']) - set(dim['bank_name']))
+        if missing:
+            print(f"  Add these banks to data/reference/bank_type.csv: {', '.join(missing)}")
+        out = os.path.join(PROCESSED_DIR, 'dim_bank.csv')
+        dim.to_csv(out, index=False)
         print(f"Saved {out}")
 
     chargebacks = clean_chargeback_files()

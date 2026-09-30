@@ -10,7 +10,7 @@ What it does:
 4. Runs sql/00_log_tables.sql (run log + quality results, kept across runs)
 5. Runs sql/01_schema.sql, which drops and rebuilds the data tables, so re-running is always safe
 6. Loads every CSV in data/processed into the table with the same name, logging each load
-7. Runs sql/03_quality_checks.sql and prints the results
+7. Runs sql/04_views.sql (views for Power BI), then sql/03_quality_checks.sql and prints the results
 8. Prints row counts and a sample query, which proves Python is talking to MySQL
 
 Run from the project root:
@@ -147,6 +147,9 @@ def main():
             status = 'OK' if db_rows == rows else 'MISMATCH'
             all_ok = all_ok and db_rows == rows
             print(f"  {table:<20} csv={rows:<6} mysql={db_rows:<6} {status}")
+
+    with engine.begin() as conn:
+        run_sql_file(conn, '04_views.sql')
 
     print("\nData quality checks:")
     with engine.begin() as conn:

@@ -164,13 +164,15 @@ def clean_bank_files():
     return df
 
 
+# Header with everything except letters removed -> clean column name.
+# NPCI changes header style between months ("Re-presentment Raised ..." vs "representment_raised_...").
 CHARGEBACK_COLUMNS = {
     'code': 'bank_code',
-    'beneficiary bank': 'bank_name',
-    'total txns during the month': 'total_txns',
-    'chargebacks received during the month': 'chargebacks_received',
-    're-presentment raised during the month': 'representments',
-    'chargebacks accepted during the month': 'chargebacks_accepted',
+    'beneficiarybank': 'bank_name',
+    'totaltxnsduringthemonth': 'total_txns',
+    'chargebacksreceivedduringthemonth': 'chargebacks_received',
+    'representmentraisedduringthemonth': 'representments',
+    'chargebacksacceptedduringthemonth': 'chargebacks_accepted',
 }
 
 
@@ -181,7 +183,7 @@ def read_chargeback_file(path):
     month_date = pd.to_datetime(f"{m.group(2)}-{m.group(1)}", format='%b-%Y')
 
     df = pd.read_excel(path, dtype=str)
-    df.columns = [str(c).strip().lower() for c in df.columns]
+    df.columns = [re.sub('[^a-z]', '', str(c).lower()) for c in df.columns]
     df = df.rename(columns=CHARGEBACK_COLUMNS)[list(CHARGEBACK_COLUMNS.values())]
     df = df.dropna(subset=['bank_name'])
     df['bank_code'] = df['bank_code'].str.strip().str.upper()

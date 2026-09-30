@@ -50,3 +50,23 @@ SELECT m AS missing_month
 FROM months
 LEFT JOIN upi_monthly u ON u.month_date = months.m
 WHERE u.month_date IS NULL;
+
+-- Q6: Bank reliability: highest technical decline rate (bank-side failures) per month,
+--     for banks with at least 50 million transactions
+SELECT month_date, bank_name, volume_mn, approved_pct, bd_pct, td_pct,
+       RANK() OVER (PARTITION BY month_date ORDER BY td_pct DESC) AS td_rank
+FROM bank_monthly
+WHERE volume_mn >= 50
+ORDER BY month_date, td_rank
+LIMIT 20;
+
+-- Q7: Bank reliability scorecard: average rates per bank across all loaded months
+SELECT bank_name,
+       COUNT(*)                     AS months,
+       ROUND(SUM(volume_mn), 2)     AS total_volume_mn,
+       ROUND(AVG(approved_pct), 2)  AS avg_approved_pct,
+       ROUND(AVG(td_pct), 2)        AS avg_td_pct,
+       ROUND(AVG(debit_reversal_success_pct), 2) AS avg_reversal_success_pct
+FROM bank_monthly
+GROUP BY bank_name
+ORDER BY total_volume_mn DESC;

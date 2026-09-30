@@ -15,12 +15,21 @@ Cleaning rules:
 - Same month in two files -> keep the NPCI download
 - Report any missing months between the first and last month
 
+Also (data/raw/bank_top50):
+- Ecosystem-Statistics-UPI-Top-50-member-performance-<YYYY>-<Mon>-Remitter.xlsx
+                              NPCI Ecosystem Statistics > Top 50 Member Performance (Remitter),
+                              one file per month. Percent columns can come as 0.9122 or 91.22;
+                              both are stored as 91.22.
+
 Output:
 - data/processed/upi_monthly.csv  (month_date, banks_live, volume_mn, value_cr, source_file)
+- data/processed/bank_monthly.csv (month_date, bank_name, volume_mn, approved_pct, bd_pct, td_pct,
+                                   debit_reversal_mn, debit_reversal_success_pct, source_file)
 """
 
 import glob
 import os
+import re
 
 import pandas as pd
 
@@ -28,6 +37,7 @@ import pandas as pd
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAW_DIR = os.path.join(ROOT, 'data', 'raw')
 PROCESSED_DIR = os.path.join(ROOT, 'data', 'processed')
+BANK_DIR = os.path.join(RAW_DIR, 'bank_top50')
 
 # Raw column name -> clean column name
 COLUMN_MAP = {
@@ -41,7 +51,7 @@ COLUMN_MAP = {
 
 def to_number(series):
     """'29,82,355.95' -> 2982355.95"""
-    return pd.to_numeric(series.astype(str).str.replace(',', '').str.strip(), errors='coerce')
+    return pd.to_numeric(series.astype(str).str.replace(',', '').str.replace('%', '').str.strip(), errors='coerce')
 
 
 def parse_month(series):
@@ -75,6 +85,73 @@ def read_raw_file(path):
     # NPCI downloads win when two files have the same month
     df['priority'] = 0 if os.path.basename(path).startswith('npci_') else 1
     return df[['month_date', 'banks_live', 'volume_mn', 'value_cr', 'source_file', 'priority']]
+
+
+# Bank file header text -> clean column name (matched on the start of the lowercased header)
+BANK_COLUMNS = [
+    ('upi remitter banks', 'bank_name'),
+    ('total volume', 'volume_mn'),
+    ('approved', 'approved_pct'),
+    ('bd', 'bd_pct'),
+    ('td', 'td_pct'),
+    ('total debit reversal count', 'debit_reversal_mn'),
+    ('debit reversal success', 'debit_reversal_success_pct'),
+]
+PCT_COLUMNS = ['approved_pct', 'bd_pct', 'td_pct', 'debit_reversal_success_pct']
+
+
+def bank_file_month(path, title):
+    """Month from the title row "(Jan'25)", else from the file name "2025-Jan" """
+    m = re.search(r"\((\w{3})'(\d{2})\)", str(title))
+    if m:
+        return pd.to_datetime(f"{m.group(1)}-{m.group(2)}", format='%b-%y')
+    m = re.search(r'(\d{4})-(\w{3})', os.path.basename(path))
+    if m:
+        return pd.to_datetime(f"{m.group(2)}-{m.group(1)}", format='%b-%Y')
+    raise SystemExit(f"Can't tell which month {os.path.basename(path)} is for")
+
+
+def read_bank_file(path):
+    raw = pd.read_excel(path, header=None, dtype=object)
+    header_row = raw.index[raw.iloc[:, 0].astype(str).str.strip().str.lower().str.startswith('sr')][0]
+    month_date = bank_file_month(path, raw.iloc[0, 0])
+
+    df = raw.iloc[header_row + 1:].copy()
+    df.columns = [str(c).strip().lower() for c in raw.iloc[header_row]]
+    rename = {}
+    for col in df.columns:
+        for prefix, clean in BANK_COLUMNS:
+            if col.startswith(prefix) and clean not in rename.values():
+                rename[col] = clean
+                break
+    df = df.rename(columns=rename)[[clean for _, clean in BANK_COLUMNS]]
+    df = df.dropna(subset=['bank_name'])
+
+    df['bank_name'] = df['bank_name'].astype(str).str.strip()
+    for col in df.columns.drop('bank_name'):
+        df[col] = to_number(df[col].replace('-', None))
+    for col in PCT_COLUMNS:
+        if df[col].max() <= 1:          # 0.9122 -> 91.22
+            df[col] = df[col] * 100
+        df[col] = df[col].round(2)
+    df.insert(0, 'month_date', month_date)
+    df['source_file'] = os.path.basename(path)
+    return df
+
+
+def clean_bank_files():
+    files = sorted(glob.glob(os.path.join(BANK_DIR, '*.xlsx')))
+    if not files:
+        return None
+    df = pd.concat([read_bank_file(p) for p in files], ignore_index=True)
+    rows_before = len(df)
+    df = df.drop_duplicates(subset=['month_date', 'bank_name']).sort_values(['month_date', 'volume_mn'],
+                                                                           ascending=[True, False])
+    months = df['month_date'].dt.strftime('%b-%Y').unique()
+    print(f"  bank_top50: {len(files)} files, {len(df)} bank-month rows "
+          f"({rows_before - len(df)} duplicates dropped), months: {', '.join(months)}")
+    df['month_date'] = df['month_date'].dt.date
+    return df
 
 
 def main():
@@ -112,6 +189,12 @@ def main():
     out = os.path.join(PROCESSED_DIR, 'upi_monthly.csv')
     df.to_csv(out, index=False)
     print(f"Saved {out}")
+
+    banks = clean_bank_files()
+    if banks is not None:
+        out = os.path.join(PROCESSED_DIR, 'bank_monthly.csv')
+        banks.to_csv(out, index=False)
+        print(f"Saved {out}")
 
 
 if __name__ == '__main__':

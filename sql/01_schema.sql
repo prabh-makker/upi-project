@@ -11,3 +11,16 @@ CREATE TABLE upi_monthly (
     CHECK (volume_mn >= 0),
     CHECK (value_cr >= 0)
 );
+
+CREATE TABLE bank_monthly (
+    month_date                  DATE          NOT NULL COMMENT '1st day of the month',
+    bank_name                   VARCHAR(120)  NOT NULL COMMENT 'Remitter (payer) bank, as NPCI names it',
+    volume_mn                   DECIMAL(12,2) NOT NULL COMMENT 'Transactions sent, in millions',
+    approved_pct                DECIMAL(5,2)  NULL COMMENT 'Share approved, 0-100',
+    bd_pct                      DECIMAL(5,2)  NULL COMMENT 'Business declines (customer side, e.g. wrong PIN), 0-100',
+    td_pct                      DECIMAL(5,2)  NULL COMMENT 'Technical declines (bank or system failure), 0-100',
+    debit_reversal_mn           DECIMAL(10,2) NULL COMMENT 'Debit reversals, in millions',
+    debit_reversal_success_pct  DECIMAL(5,2)  NULL COMMENT 'Share of debit reversals that succeeded, 0-100',
+    source_file                 VARCHAR(150)  NOT NULL COMMENT 'Raw file this row came from',
+    PRIMARY KEY (month_date, bank_name)
+);

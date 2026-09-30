@@ -31,7 +31,6 @@ from sklearn.linear_model import LinearRegression  # noqa: E402
 from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from load_to_mysql import POWERBI_DIR, ROOT, get_settings, make_engine  # noqa: E402
 
 TRAIN_MONTHS = 36   # the last 3 years; UPI grew much faster before that, so older months mislead
@@ -80,7 +79,6 @@ def main():
     except Exception as e:
         sys.exit("Could not read upi_monthly from MySQL. Run python python/load_to_mysql.py first.\n"
                  f"Details: {e}")
-    df['volume_mn'] = df['volume_mn'].astype(float)
     df['t'] = np.arange(1, len(df) + 1)  # month number: 1, 2, 3, ...
     if len(df) < TRAIN_MONTHS + HORIZON * BACKTESTS:
         sys.exit(f"Need at least {TRAIN_MONTHS + HORIZON * BACKTESTS} months of data, found {len(df)}.")

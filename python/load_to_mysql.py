@@ -24,11 +24,9 @@ from datetime import datetime
 
 import pandas as pd
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.engine import URL
+from sqlalchemy import URL, create_engine, text
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import data_cleaning  # noqa: E402
+import data_cleaning  # our own cleaning script, in the same folder
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROCESSED_DIR = os.path.join(ROOT, 'data', 'processed')
@@ -84,33 +82,19 @@ def run_sql_file(conn, name):
     print(f"Ran sql/{name} ({len(statements)} statements)")
 
 
-def log_load(engine, run_time, table, df, source_files, status, error=None):
+def log_load(engine, run_time, table, df, status, error=None):
     months = pd.to_datetime(df['month_date']) if df is not None and 'month_date' in df else None
     with engine.begin() as conn:
         conn.execute(text("""
             INSERT INTO etl_run_log (run_time, table_name, source_files, first_month, last_month,
                                      rows_loaded, status, error_message)
             VALUES (:run_time, :table, :files, :first, :last, :rows, :status, :error)
-        """), {'run_time': run_time, 'table': table, 'files': source_files,
+        """), {'run_time': run_time, 'table': table,
+               'files': df['source_file'].nunique() if df is not None and 'source_file' in df else None,
                'first': months.min().date() if months is not None else None,
                'last': months.max().date() if months is not None else None,
                'rows': len(df) if df is not None else None, 'status': status,
                'error': str(error)[:2000] if error else None})
-
-
-def load_csv(engine, path, existing_tables):
-    """Load one CSV into the table named after the file"""
-    table = os.path.splitext(os.path.basename(path))[0].lower()
-    df = pd.read_csv(path)
-    # Columns with 'date' in the name become real DATE columns in MySQL
-    for col in df.columns:
-        if 'date' in col.lower():
-            df[col] = pd.to_datetime(df[col]).dt.date
-    # Tables from 01_schema.sql keep their types and keys; any other CSV gets a new table
-    mode = 'append' if table in existing_tables else 'replace'
-    df.to_sql(table, engine, if_exists=mode, index=False, chunksize=1000)
-    source_files = df['source_file'].nunique() if 'source_file' in df else None
-    return table, df, source_files
 
 
 def main():
@@ -126,17 +110,19 @@ def main():
     with engine.begin() as conn:
         run_sql_file(conn, '00_log_tables.sql')
         run_sql_file(conn, '01_schema.sql')
-    existing_tables = set(inspect(engine).get_table_names())
 
     loaded = {}
     for path in csvs:
         table = os.path.splitext(os.path.basename(path))[0].lower()
         try:
-            table, df, source_files = load_csv(engine, path, existing_tables)
+            # Every CSV has its table in 01_schema.sql, so append keeps the types and keys.
+            # MySQL turns the 'YYYY-MM-DD' text in month_date into a DATE by itself.
+            df = pd.read_csv(path)
+            df.to_sql(table, engine, if_exists='append', index=False, chunksize=1000)
         except Exception as e:
-            log_load(engine, run_time, table, None, None, 'FAILED', e)
+            log_load(engine, run_time, table, None, 'FAILED', e)
             raise
-        log_load(engine, run_time, table, df, source_files, 'SUCCESS')
+        log_load(engine, run_time, table, df, 'SUCCESS')
         loaded[table] = len(df)
         print(f"Loaded {len(df):>6} rows from {os.path.basename(path)} into table {table}")
 

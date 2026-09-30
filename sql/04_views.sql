@@ -18,8 +18,7 @@ FROM upi_monthly;
 CREATE OR REPLACE VIEW vw_bank_scorecard AS
 WITH bench AS (
     SELECT month_date,
-           SUM(volume_mn * td_pct) / SUM(volume_mn) AS industry_td_pct,
-           SUM(volume_mn * bd_pct) / SUM(volume_mn) AS industry_bd_pct
+           SUM(volume_mn * td_pct) / SUM(volume_mn) AS industry_td_pct
     FROM bank_monthly
     GROUP BY month_date
 )

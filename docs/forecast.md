@@ -3,7 +3,6 @@
 Script: `python/forecast.py`. Run it after the loader:
 
 ```
-pip install scikit-learn matplotlib
 python python/forecast.py
 ```
 

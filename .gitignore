@@ -9,9 +9,6 @@ __pycache__/
 
 # Power BI (the .pbix is committed so recruiters can open it)
 
-# Jupyter
-.ipynb_checkpoints/
-
 # IDE
 .vscode/
 .idea/

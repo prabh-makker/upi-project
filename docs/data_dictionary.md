@@ -100,6 +100,8 @@ totals within 15% of it.
 - `bank_monthly` covers only the top 50 remitter banks each month, which is most of the volume but not all of it.
 - Bank-wise and app-wise data is available here for 13 and 12 months, so trends there are short.
 - NPCI lists Slice Small Finance Bank twice in Mar and Jun 2026, so rows are keyed on rank, not name.
+- The May 2026 chargeback file lists Deutsche Bank (DEU) twice with different counts. The two rows are added together.
+- Remitter percentages come as 91.22 in most files and 0.9122 in one (Jan 2025). The scale is read from approved % per file, and all are stored as 91.22.
 - NPCI's Aug 2026 Remitter file is titled "Jul'26" but holds August data. The month is taken from the file name.
 - App data for Mar, May and Jun 2026 was saved from NPCI's page as JSON because the download link returned 404. The numbers are the same table.
 - Bank names change over time (for example regional rural banks that merged), so some banks appear under a new name mid-series.

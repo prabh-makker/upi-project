@@ -55,16 +55,13 @@ FROM (
 WHERE apps < 0.9 * prev_apps;
 
 -- 7. Gaps: no missing months in the monthly totals
+-- month_date is the key and always the 1st, so missing months = months from first to last + 1 - rows
 INSERT INTO dq_results (run_time, check_name, table_name, failed_rows, status, rule)
-WITH RECURSIVE months AS (
-    SELECT MIN(month_date) AS m FROM upi_monthly
-    UNION ALL
-    SELECT m + INTERVAL 1 MONTH FROM months WHERE m < (SELECT MAX(month_date) FROM upi_monthly)
-)
-SELECT @run_time, 'no_missing_months', 'upi_monthly', COUNT(*), IF(COUNT(*) = 0, 'PASS', 'FAIL'),
+SELECT @run_time, 'no_missing_months', 'upi_monthly',
+       TIMESTAMPDIFF(MONTH, MIN(month_date), MAX(month_date)) + 1 - COUNT(*),
+       IF(TIMESTAMPDIFF(MONTH, MIN(month_date), MAX(month_date)) + 1 = COUNT(*), 'PASS', 'FAIL'),
        'every month between the first and last month is present'
-FROM months LEFT JOIN upi_monthly u ON u.month_date = months.m
-WHERE u.month_date IS NULL;
+FROM upi_monthly;
 
 -- 8. Freshness: latest month should be at most 3 months old (NPCI publishes with a lag)
 INSERT INTO dq_results (run_time, check_name, table_name, failed_rows, status, rule)

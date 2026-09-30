@@ -89,32 +89,30 @@ ORDER BY avg_td_pct DESC;
 -- Q10. Most improved and most worsened: TD % in the last 3 months vs the first 3 months (Sep-Nov 2025)
 WITH first3 AS (
     SELECT bank_name, AVG(td_pct) AS td_before FROM bank_monthly
-    WHERE month_date BETWEEN '2025-09-01' AND '2025-11-01' GROUP BY bank_name HAVING COUNT(*) = 3
+    WHERE month_date BETWEEN '2025-09-01' AND '2025-11-01' GROUP BY bank_name HAVING COUNT(DISTINCT month_date) = 3
 ), last3 AS (
     SELECT bank_name, AVG(td_pct) AS td_after FROM bank_monthly
-    WHERE month_date BETWEEN '2026-06-01' AND '2026-08-01' GROUP BY bank_name HAVING COUNT(*) = 3
+    WHERE month_date BETWEEN '2026-06-01' AND '2026-08-01' GROUP BY bank_name HAVING COUNT(DISTINCT month_date) = 3
 )
 SELECT f.bank_name, ROUND(f.td_before, 3) AS td_before, ROUND(l.td_after, 3) AS td_after,
        ROUND(l.td_after - f.td_before, 3) AS change_pct_points
 FROM first3 f JOIN last3 l ON l.bank_name = f.bank_name
 ORDER BY change_pct_points;
 
--- Q11. Streaks (gaps and islands): banks worse than the industry TD for 3+ months in a row
+-- Q11. Streaks (gaps and islands): banks worse than the industry TD for 3+ calendar months in a row.
+-- The month minus the bank's rank among its "worse" months stays the same while the months are
+-- back to back, and changes after a gap (a better month, or a month outside the top 50).
 WITH flagged AS (
     SELECT bank_name, month_date,
-           td_vs_industry > 0 AS worse,
-           ROW_NUMBER() OVER (PARTITION BY bank_name ORDER BY month_date) AS rn_all,
-           ROW_NUMBER() OVER (PARTITION BY bank_name, td_vs_industry > 0 ORDER BY month_date) AS rn_flag
+           month_date - INTERVAL DENSE_RANK() OVER (PARTITION BY bank_name ORDER BY month_date) MONTH AS grp
     FROM vw_bank_scorecard
-    WHERE month_date >= '2025-09-01'
-), islands AS (
-    SELECT bank_name, MIN(month_date) AS streak_start, MAX(month_date) AS streak_end, COUNT(*) AS months
-    FROM flagged
-    WHERE worse = 1
-    GROUP BY bank_name, rn_all - rn_flag
+    WHERE month_date >= '2025-09-01' AND td_vs_industry > 0
 )
-SELECT * FROM islands
-WHERE months >= 3
+SELECT bank_name, MIN(month_date) AS streak_start, MAX(month_date) AS streak_end,
+       COUNT(DISTINCT month_date) AS months
+FROM flagged
+GROUP BY bank_name, grp
+HAVING months >= 3
 ORDER BY months DESC, bank_name;
 
 -- Q12. Scale vs reliability: do bigger banks fail less? Banks split into 4 volume groups

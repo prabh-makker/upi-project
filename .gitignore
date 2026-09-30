@@ -15,3 +15,6 @@ __pycache__/
 
 # Power BI CSV exports (made by the loader)
 powerbi/data/
+
+# Graphify project graph (rebuilt at every Claude session start)
+graphify-out/

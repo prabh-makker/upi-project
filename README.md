@@ -34,7 +34,10 @@ Where monthly files overlap, the NPCI download is used. Together they cover Apr 
 2. `pip install pandas sqlalchemy pymysql python-dotenv cryptography openpyxl`
 3. `python python/load_to_mysql.py`
 
-This cleans `data/raw` into `data/processed/upi_monthly.csv`, re-creates the `upi_db` database,
-creates the tables from `sql/01_schema.sql`, loads the data and prints row counts to confirm.
+This cleans `data/raw` into `data/processed`, creates `upi_db` if needed, rebuilds the four data tables
+(`upi_monthly`, `bank_monthly`, `app_monthly`, `chargeback_monthly`), loads them, logs the run in `etl_run_log`,
+and runs 11 data quality checks (`sql/03_quality_checks.sql`, results in `dq_results`).
 Safe to re-run any time, for example after adding a new NPCI file to `data/raw`.
 Then run `sql/02_analysis_queries.sql` in MySQL Workbench.
+
+Column meanings, KPI formulas and known limitations: [docs/data_dictionary.md](docs/data_dictionary.md).

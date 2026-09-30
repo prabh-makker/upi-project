@@ -1,6 +1,12 @@
--- UPI project: table definitions
--- python/load_to_mysql.py runs this file after creating a fresh upi_db,
--- then fills the tables from data/processed.
+-- UPI project: data table definitions
+-- python/load_to_mysql.py runs this file on every run, then fills the tables from data/processed.
+-- The data tables are dropped and rebuilt each time, so a re-run never duplicates rows.
+-- The log tables in 00_log_tables.sql are kept.
+
+DROP TABLE IF EXISTS upi_monthly;
+DROP TABLE IF EXISTS bank_monthly;
+DROP TABLE IF EXISTS chargeback_monthly;
+DROP TABLE IF EXISTS app_monthly;
 
 CREATE TABLE upi_monthly (
     month_date   DATE          NOT NULL PRIMARY KEY COMMENT '1st day of the month',

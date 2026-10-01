@@ -4,13 +4,12 @@ UPI Volume Forecasting using XGBoost
 Generates realistic forecasts based on synthetic historical trends
 """
 
+import os
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from xgboost import XGBRegressor
 from sklearn.preprocessing import MinMaxScaler
-import warnings
-warnings.filterwarnings('ignore')
 
 def get_historical_data():
     """Generate synthetic but realistic UPI volume data"""
@@ -108,7 +107,7 @@ def generate_forecasts(model, scaler, df, feature_cols, forecast_days=90):
 
 def save_as_sql(forecast_df):
     """Generate SQL INSERT statements"""
-    sql_file = "C:\\Users\\khalo\\OneDrive\\Desktop\\sql\\05_load_forecasts.sql"
+    sql_file = os.path.join(os.path.dirname(__file__), "sql", "05_load_forecasts.sql")
 
     with open(sql_file, 'w') as f:
         f.write("-- XGBoost UPI Volume Forecasts\n")

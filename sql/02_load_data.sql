@@ -14,8 +14,8 @@ USE upi_db;
 
 -- Set strict mode and disable foreign key checks during load
 SET SESSION sql_mode = 'STRICT_TRANS_TABLES';
-SET SESSION FOREIGN_KEY_CHECKS = 0;
-SET SESSION UNIQUE_CHECKS = 0;
+-- Foreign key checks enabled for data integrity
+SET SESSION unique_checks=1, foreign_key_checks=1;
 SET SESSION autocommit = 0;
 
 -- ============================================================================
@@ -156,7 +156,6 @@ WHERE
     AND dd.date_val <= '2026-09-29'
     AND db.is_active = TRUE
     AND dut.is_active = TRUE
-    AND RAND() < 0.3  -- Load ~30% of possible combinations to avoid excessive rows
 ON DUPLICATE KEY UPDATE
     transaction_count = VALUES(transaction_count),
     transaction_value_cr = VALUES(transaction_value_cr),

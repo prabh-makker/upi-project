@@ -39,13 +39,4 @@ JOIN dim_date d ON f.date_id = d.date_id
 WHERE f.success_rate IS NOT NULL
 ORDER BY b.bank_id, d.date_val DESC;
 
--- Q5: Peak hours analysis
-SELECT HOUR(d.date_val) as hour,
-  COUNT(*) as txn_count,
-  ROUND(AVG(f.success_rate), 2) as avg_success
-FROM fact_upi_transactions f
-JOIN dim_date d ON f.date_id = d.date_id
-GROUP BY HOUR(d.date_val)
-ORDER BY txn_count DESC;
-
--- More queries in full plan...
+-- End of business queries

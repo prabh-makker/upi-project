@@ -18,6 +18,8 @@ A complete end-to-end analytics platform analyzing India's Unified Payments Inte
 
 **Status:** Portfolio project. Dashboard and SQL schema are complete; see "Data and limitations" below.
 
+![UPI Analytics Dashboard](screenshots/dashboard.jpg)
+
 ---
 
 ## 🎯 What This Project Does

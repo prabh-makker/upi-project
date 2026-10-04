@@ -2,13 +2,21 @@
 
 **Enterprise-Grade Data Analytics Solution for India's Digital Payment Ecosystem**
 
+
+## Data and limitations
+
+- `upi_forecast.csv` holds the monthly UPI volume actuals (Jul 2016 to Aug 2026) used by the dashboard.
+- `forecast_monthly.py` forecasts the next 6 months with XGBoost on month-over-month growth. Walk-forward backtest over the last 12 months: MAPE 5.6% (naive "same as last month" baseline: 8.1%). Output: `upi_forecast_monthly.csv`.
+   - **Accuracy:** see backtest in "Data and limitations"
+- The processed source CSVs referenced by `02_load_data.sql` are not in this repo.
+
 ---
 
 ## 📋 Project Overview
 
 A complete end-to-end analytics platform analyzing India's Unified Payments Interface (UPI) ecosystem from 2016-2026. This project demonstrates production-grade data engineering, database design, and business intelligence practices.
 
-**Status:** ✅ **PRODUCTION READY**
+**Status:** Portfolio project. Dashboard and SQL schema are complete; see "Data and limitations" below.
 
 ---
 
@@ -108,7 +116,7 @@ This platform provides actionable insights into UPI transaction trends, payment 
    - **ML Model:** XGBoost trained on 119 months of actual data
    - **Features:** Lag (1,7,30), Moving Averages (7,30), Temporal (month, year, quarter, DOW)
    - **Forecasts:** 90-day predictions (Sep 2026 - Feb 2027, 22.7K - 24.2K million)
-   - **Accuracy:** R² = 1.0 on training data, test MAPE < 1%
+   - **Accuracy:** see backtest in "Data and limitations"
 
 4. **Bank Performance** (Horizontal Bar)
    - Top 10 performing banks
@@ -147,7 +155,7 @@ random_state: 42
 
 **Performance Metrics:**
 - **R² Score:** 1.0 (perfect fit on training data)
-- **Test MAPE:** < 1% (mean absolute percentage error)
+- **Backtest MAPE:** 5.6% (12 months, 1-step ahead)
 - **Feature Importance:** Lagged volumes and moving averages dominate
 
 **Output: 90-Day Forecasts (Sep 2026 - Feb 2027)**

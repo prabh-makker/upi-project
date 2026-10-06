@@ -1,4 +1,4 @@
--- Q1: Daily UPI volume trend with YoY growth
+-- Q1: Daily UPI volume trend with day-over-day growth
 SELECT DATE(d.date_val) as date,
   SUM(f.transaction_count) as txn_count,
   LAG(SUM(f.transaction_count)) OVER (ORDER BY d.date_val) as prev_day,

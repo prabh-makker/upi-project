@@ -156,11 +156,11 @@ SELECT '=== 4. DATA RANGE AND CONSTRAINT VALIDATION ===' AS validation_section;
 -- Check 4.1: Date values are valid
 SELECT
     'DIM_DATE: Valid Date Range' AS check_name,
-    'Dates should be between 2020-01-01 and 2026-12-31' AS criteria,
+    'Dates should be between 2016-04-01 and 2026-12-31' AS criteria,
     CONCAT('Out of range: ', COUNT(*)) AS result,
     CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS status
 FROM dim_date
-WHERE date_val < '2020-01-01' OR date_val > '2026-12-31';
+WHERE date_val < '2016-04-01' OR date_val > '2026-12-31';
 
 -- Check 4.2: Month values are valid (1-12)
 SELECT

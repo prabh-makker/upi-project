@@ -25,22 +25,17 @@ SET SESSION autocommit = 0;
 -- Clear existing data (optional - comment out in production if incremental load)
 -- TRUNCATE TABLE dim_date;
 
--- Load date dimension from cleaned data
--- Generate dates from 2020-01-01 to 2026-12-31 for comprehensive time coverage
+-- Generate every day from UPI launch (2016-04-01) to 2026-12-31 (about 3,900 rows)
+SET SESSION cte_max_recursion_depth = 5000;
 INSERT INTO dim_date (date_val, year, month, day, quarter, week, is_weekend)
-SELECT
-    DATE_ADD('2020-01-01', INTERVAL (t0.id + t1.id * 10 + t2.id * 100) DAY) AS date_val,
-    YEAR(DATE_ADD('2020-01-01', INTERVAL (t0.id + t1.id * 10 + t2.id * 100) DAY)) AS year,
-    MONTH(DATE_ADD('2020-01-01', INTERVAL (t0.id + t1.id * 10 + t2.id * 100) DAY)) AS month,
-    DAY(DATE_ADD('2020-01-01', INTERVAL (t0.id + t1.id * 10 + t2.id * 100) DAY)) AS day,
-    QUARTER(DATE_ADD('2020-01-01', INTERVAL (t0.id + t1.id * 10 + t2.id * 100) DAY)) AS quarter,
-    WEEK(DATE_ADD('2020-01-01', INTERVAL (t0.id + t1.id * 10 + t2.id * 100) DAY), 1) AS week,
-    CASE WHEN DAYOFWEEK(DATE_ADD('2020-01-01', INTERVAL (t0.id + t1.id * 10 + t2.id * 100) DAY)) IN (1, 7) THEN TRUE ELSE FALSE END AS is_weekend
-FROM
-    (SELECT 0 AS id UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9) AS t0,
-    (SELECT 0 AS id UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9) AS t1,
-    (SELECT 0 AS id UNION SELECT 1 UNION SELECT 2) AS t2
-WHERE DATE_ADD('2020-01-01', INTERVAL (t0.id + t1.id * 10 + t2.id * 100) DAY) <= '2026-12-31'
+WITH RECURSIVE d AS (
+    SELECT DATE('2016-04-01') AS dt
+    UNION ALL
+    SELECT dt + INTERVAL 1 DAY FROM d WHERE dt < '2026-12-31'
+)
+SELECT dt, YEAR(dt), MONTH(dt), DAY(dt), QUARTER(dt), WEEK(dt, 1),
+       DAYOFWEEK(dt) IN (1, 7)
+FROM d
 ON DUPLICATE KEY UPDATE
     year = VALUES(year),
     month = VALUES(month),
@@ -92,7 +87,7 @@ ON DUPLICATE KEY UPDATE
 -- Log bank dimension load
 INSERT INTO etl_load_audit (source_file, target_table, rows_inserted, load_status)
 VALUES
-    ('data/processed/npci_upi_clean.csv', 'dim_bank', (SELECT COUNT(*) FROM dim_bank), 'SUCCESS');
+    ('MANUAL_LIST', 'dim_bank', (SELECT COUNT(*) FROM dim_bank), 'SUCCESS');
 
 SELECT CONCAT('Loaded ', COUNT(*), ' bank records') AS load_status FROM dim_bank;
 
@@ -123,7 +118,7 @@ ON DUPLICATE KEY UPDATE
 -- Log UPI type dimension load
 INSERT INTO etl_load_audit (source_file, target_table, rows_inserted, load_status)
 VALUES
-    ('data/processed/rbi_settlement_clean.csv', 'dim_upi_type', (SELECT COUNT(*) FROM dim_upi_type), 'SUCCESS');
+    ('MANUAL_LIST', 'dim_upi_type', (SELECT COUNT(*) FROM dim_upi_type), 'SUCCESS');
 
 SELECT CONCAT('Loaded ', COUNT(*), ' UPI type records') AS load_status FROM dim_upi_type;
 
@@ -134,8 +129,10 @@ SELECT CONCAT('Loaded ', COUNT(*), ' UPI type records') AS load_status FROM dim_
 -- Clear existing fact data (optional)
 -- TRUNCATE TABLE fact_upi_transactions;
 
--- Load sample transaction facts
--- In production, use LOAD DATA INFILE with proper error handling
+-- SYNTHETIC: bank x UPI-type daily figures are not published at this detail, so the
+-- fact table is filled with RAND() values to exercise the schema, constraints and
+-- queries. The dashboard trend and the forecast use real NPCI monthly data
+-- (upi_forecast.csv). With real data, replace this with LOAD DATA INFILE.
 INSERT INTO fact_upi_transactions
     (date_id, bank_id, upi_type_id, transaction_count, transaction_value_cr, success_rate, avg_txn_value, is_validated)
 SELECT
@@ -166,7 +163,7 @@ ON DUPLICATE KEY UPDATE
 -- Log fact table load
 INSERT INTO etl_load_audit (source_file, target_table, rows_inserted, load_status)
 SELECT
-    'COMBINED: npci_upi_clean.csv + rbi_settlement_clean.csv' AS source_file,
+    'SYNTHETIC_RAND' AS source_file,
     'fact_upi_transactions' AS target_table,
     COUNT(*) AS rows_inserted,
     'SUCCESS' AS load_status

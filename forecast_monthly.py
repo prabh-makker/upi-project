@@ -3,7 +3,8 @@
 Honest evaluation: walk-forward backtest over the last 12 months, compared with
 a naive "same as last month" baseline. Forecast = XGBoost on month-over-month
 growth (trees cannot extrapolate a rising level), intervals from backtest errors.
-Run: python forecast_monthly.py   (writes upi_forecast_monthly.csv)
+Run: python forecast_monthly.py   (writes upi_forecast_monthly.csv and refreshes the
+forecast columns of upi_forecast.csv, which the Power BI dashboard reads)
 """
 import numpy as np
 import pandas as pd
@@ -64,3 +65,21 @@ if __name__ == "__main__":
     res = pd.DataFrame({"month": fc.index.strftime("%Y-%m-%d"), "forecast_volume_mn": fc.round(1).values,
                         "lower_mn": (fc * (1 - 1.96 * err)).round(1).values, "upper_mn": (fc * (1 + 1.96 * err)).round(1).values})
     res.to_csv(OUT, index=False); print(res.to_string(index=False))
+
+    # Refresh the dashboard file: actuals stay, last 12 months carry the walk-forward
+    # (out-of-sample) predictions, then the 6-month forecast with its range.
+    test_idx = set(vol.index[-TEST_MONTHS:])
+    bt = dict(zip(vol.index[-TEST_MONTHS:], pred))
+    rows = ["month_date,row_type,actual_volume_mn,forecast_volume_mn,lower_mn,upper_mn,model"]
+    for line in open(SRC, encoding="utf-8").read().splitlines()[1:]:
+        p = line.split(",")
+        if p[1] == "future":
+            continue
+        m = pd.to_datetime(p[0], format="%m/%d/%Y")
+        if m in test_idx:
+            rows.append(f"{p[0]},test,{p[2]},{bt[m]:.1f},,,XGBoost")
+        else:
+            rows.append(f"{p[0]},actual,{p[2]},,,,XGBoost")
+    for _, r in res.iterrows():
+        rows.append(f"{pd.Timestamp(r.month):%m/%d/%Y},future,,{r.forecast_volume_mn},{r.lower_mn},{r.upper_mn},XGBoost")
+    open(SRC, "w", encoding="utf-8", newline="\n").write("\n".join(rows) + "\n")
